@@ -1,0 +1,82 @@
+# Pile de développement BreastAI : PostgreSQL + API FastAPI + frontend Vite.
+# Démarrage : cp .env.example .env && docker compose up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: breastai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-breastai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-breastai}
+      POSTGRES_DB: ${POSTGRES_DB:-breastai}
+    ports:
+      # Port hôte configurable : une instance PostgreSQL déjà installée sur la
+      # machine occupe généralement 5432 et empêcherait le conteneur de démarrer.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Le backend attend cette sonde : sans elle il démarre avant que la base
+      # n'accepte les connexions.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-breastai} -d ${POSTGRES_DB:-breastai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: breastai-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${APP_NAME:-BreastAI}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      POSTGRES_USER: ${POSTGRES_USER:-breastai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-breastai}
+      POSTGRES_DB: ${POSTGRES_DB:-breastai}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY:-dev-only-insecure-secret-key-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Rechargement à chaud du code ; `models` et `uploads` persistent hors image.
+      - ./backend:/app
+      - ./models:/app/models
+      - backend_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      target: dev
+    container_name: breastai-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      # Volume anonyme : conserve les node_modules de l'image, que le montage
+      # ci-dessus masquerait autrement.
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+  backend_uploads:

@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Palette BreastAI : rose sobre pour l'identité, gris neutres pour l'imagerie. */
+  --color-brand-50: oklch(0.97 0.02 350);
+  --color-brand-100: oklch(0.94 0.04 350);
+  --color-brand-300: oklch(0.78 0.11 350);
+  --color-brand-500: oklch(0.62 0.16 350);
+  --color-brand-600: oklch(0.55 0.16 350);
+  --color-brand-700: oklch(0.46 0.14 350);
+
+  /* Couleurs de résultat : jamais utilisées seules, toujours doublées d'un libellé. */
+  --color-benign: oklch(0.63 0.13 160);
+  --color-malignant: oklch(0.6 0.19 25);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}

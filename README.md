@@ -114,6 +114,27 @@ npm install
 npm run dev
 ```
 
+## Base de données
+
+```bash
+# 1. Appliquer les migrations
+cd backend
+alembic upgrade head
+
+# 2. Créer le compte administrateur initial (idempotent)
+#    FIRST_ADMIN_EMAIL et FIRST_ADMIN_PASSWORD doivent être définis dans .env
+python -m app.database.init_db
+```
+
+Sans cet administrateur, aucun compte ne peut être créé : c'est l'amorçage de la
+plateforme. Les migrations vivent dans `backend/app/database/migrations/`.
+
+```bash
+alembic revision --autogenerate -m "description"   # nouvelle migration
+alembic downgrade -1                               # revenir en arrière
+alembic check                                      # dérive modèles / schéma
+```
+
 ## Tests
 
 ```bash
@@ -128,7 +149,7 @@ cd frontend && npm test
 ## Feuille de route
 
 - [x] **Phase 1** — Scaffolding, docker-compose, README
-- [ ] **Phase 2** — Auth JWT, modèles SQLAlchemy (User, Patient, Analysis), migrations Alembic
+- [x] **Phase 2** — Auth JWT, modèles SQLAlchemy (User, Patient, Analysis), migrations Alembic
 - [ ] **Phase 3** — CRUD patients, upload mammographies (DICOM/PNG/JPG), prétraitement
 - [ ] **Phase 4** — Inférence EfficientNet + Grad-CAM
 - [ ] **Phase 5** — Génération de rapports PDF

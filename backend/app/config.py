@@ -37,11 +37,18 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     database_url: str | None = None
 
-    # ---------- Sécurité (utilisé en Phase 2) ----------
+    # ---------- Sécurité ----------
     secret_key: str = "dev-only-insecure-secret-key-change-me"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    password_reset_token_expire_minutes: int = 30
+
+    # ---------- Compte administrateur initial ----------
+    # Utilisé une seule fois par `python -m app.database.init_db`.
+    first_admin_email: str | None = None
+    first_admin_password: str | None = None
+    first_admin_name: str = "Administrateur BreastAI"
 
     # ---------- CORS ----------
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
