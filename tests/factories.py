@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 import pydicom
 from pydicom.dataset import FileMetaDataset
-from pydicom.uid import ExplicitVRLittleEndian
+from pydicom.uid import UID, ExplicitVRLittleEndian, JPEG2000Lossless, RLELossless
 
 
 def _synthetic_breast(height: int, width: int, seed: int = 0) -> np.ndarray:
@@ -62,8 +62,14 @@ def make_dicom_bytes(
     width: int = 250,
     seed: int = 3,
     photometric: str = "MONOCHROME2",
+    transfer_syntax: UID | None = None,
 ) -> bytes:
-    """DICOM conforme à la partie 10 : préambule de 128 octets puis « DICM »."""
+    """DICOM conforme à la partie 10 : préambule de 128 octets puis « DICM ».
+
+    `transfer_syntax` permet de produire un fichier compressé (`JPEG2000Lossless`,
+    `RLELossless`) et non plus seulement du non compressé — c'est ce que produisent
+    la plupart des mammographes en pratique.
+    """
     pixels = _synthetic_breast(height, width, seed).astype(np.uint16)
 
     meta = FileMetaDataset()
@@ -86,9 +92,22 @@ def make_dicom_bytes(
     dataset.PixelRepresentation = 0
     dataset.PixelData = pixels.tobytes()
 
+    if transfer_syntax is not None:
+        dataset.compress(transfer_syntax)
+
     buffer = io.BytesIO()
     dataset.save_as(buffer, enforce_file_format=True)
     return buffer.getvalue()
+
+
+def make_jpeg2000_dicom_bytes(height: int = 200, width: int = 160, seed: int = 4) -> bytes:
+    """DICOM compressé en JPEG 2000 sans perte — nécessite pylibjpeg-openjpeg."""
+    return make_dicom_bytes(height, width, seed, transfer_syntax=JPEG2000Lossless)
+
+
+def make_rle_dicom_bytes(height: int = 200, width: int = 160, seed: int = 5) -> bytes:
+    """DICOM compressé en RLE sans perte."""
+    return make_dicom_bytes(height, width, seed, transfer_syntax=RLELossless)
 
 
 def make_corrupted_png_bytes() -> bytes:

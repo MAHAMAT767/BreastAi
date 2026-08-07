@@ -26,6 +26,13 @@ qualifié. Toute sortie du système (probabilité, carte thermique, rapport, ré
 l'assistant) doit être interprétée et validée par un médecin. Le logiciel n'a fait
 l'objet d'aucune certification en tant que dispositif médical.
 
+> **⛔ Le modèle actuellement livré est un placeholder sans aucune valeur clinique.**
+> Faute de jeu de mammographies annotées, il s'agit d'un EfficientNet-B0 à poids
+> ImageNet dont la tête de classification est initialisée au hasard : **il n'a
+> jamais vu de mammographie**. Ses prédictions sont des valeurs arbitraires,
+> destinées uniquement à valider la chaîne technique. Voir
+> [docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md).
+
 ---
 
 ## Architecture
@@ -151,7 +158,7 @@ cd frontend && npm test
 - [x] **Phase 1** — Scaffolding, docker-compose, README
 - [x] **Phase 2** — Auth JWT, modèles SQLAlchemy (User, Patient, Analysis), migrations Alembic
 - [x] **Phase 3** — CRUD patients, upload mammographies (DICOM/PNG/JPG), prétraitement
-- [ ] **Phase 4** — Inférence EfficientNet + Grad-CAM
+- [x] **Phase 4** — Inférence EfficientNet + Grad-CAM *(modèle placeholder — voir l'avertissement)*
 - [ ] **Phase 5** — Génération de rapports PDF
 - [ ] **Phase 6** — Frontend React complet + tableau de bord Recharts
 - [ ] **Phase 7** — Assistant IA conversationnel avec disclaimer médical

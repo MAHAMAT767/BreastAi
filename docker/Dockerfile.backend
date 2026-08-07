@@ -13,6 +13,13 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y libpq5 curl \
     && rm -rf /var/lib/apt/lists/*
 
+# PyTorch d'abord, depuis l'index CPU : la roue PyPI pour Linux embarque CUDA et
+# fait grossir l'image de plus de 2 Go pour rien — l'inférence tourne sur CPU.
+# Installé avant requirements.txt pour que la contrainte y soit déjà satisfaite.
+RUN pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch==2.13.0 torchvision==0.28.0
+
 # Les dépendances sont copiées seules pour que le cache de couche survive
 # aux modifications du code applicatif.
 COPY backend/requirements.txt backend/requirements-dev.txt ./
