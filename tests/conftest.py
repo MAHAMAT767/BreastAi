@@ -19,17 +19,45 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.auth import rate_limit
 from app.auth.roles import UserRole
 from app.config import settings
 from app.database.base import Base
 from app.database.session import get_db
 from app.main import create_app
+from app.models.patient import Patient
 from app.models.user import User
-from app.services import user_service
+from app.services import patient_service, user_service
 
 # Mots de passe de test : au moins 12 caractères, comme l'impose la validation.
 ADMIN_PASSWORD = "AdminBreastAI-2026"
 DOCTOR_PASSWORD = "DocteurBreastAI-2026"
+
+
+@pytest.fixture(autouse=True)
+def isolated_uploads(tmp_path, monkeypatch) -> None:
+    """Chaque test écrit ses images dans son propre répertoire temporaire.
+
+    Sans cela, les tests d'upload pollueraient le dossier `uploads/` du dépôt
+    avec des fichiers qui survivraient à la session.
+    """
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
+
+
+@pytest.fixture(autouse=True)
+def disabled_rate_limiting() -> Iterator[None]:
+    """Désactive la limitation de débit par défaut.
+
+    Les tests d'authentification enchaînent bien plus de connexions que le quota
+    réel ; ils échoueraient en 429 pour une raison sans rapport avec ce qu'ils
+    vérifient. Le test dédié la réactive explicitement.
+    """
+    previous = rate_limit.limiter.enabled
+    rate_limit.limiter.enabled = False
+    rate_limit.reset()
+    yield
+    rate_limit.limiter.enabled = previous
+    rate_limit.reset()
 
 
 @pytest.fixture
@@ -111,6 +139,17 @@ def researcher_user(db: Session) -> User:
         password=DOCTOR_PASSWORD,
         full_name="Chercheur Test",
         role=UserRole.RESEARCHER,
+    )
+
+
+@pytest.fixture
+def patient(db: Session, doctor_user: User) -> Patient:
+    return patient_service.create_patient(
+        db,
+        code="TCD-2026-0001",
+        first_name="Amina",
+        last_name="Ali",
+        created_by_id=doctor_user.id,
     )
 
 

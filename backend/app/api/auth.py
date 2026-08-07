@@ -1,16 +1,27 @@
-"""Endpoints d'authentification."""
+"""Endpoints d'authentification.
 
-from __future__ import annotations
+Ce module n'utilise **pas** `from __future__ import annotations`, contrairement au
+reste du backend, et il ne faut pas le rajouter.
+
+Les décorateurs `@limiter.limit(...)` de slowapi enveloppent la fonction avec
+`functools.wraps`, qui ne transporte pas `__globals__`. FastAPI résout les
+annotations différées via le `__globals__` de la fonction appelée : sur une route
+ainsi enveloppée, il chercherait `DbSession` dans les globales de slowapi, ne le
+trouverait pas, et prendrait `db` et `form_data` pour de simples paramètres de
+requête — d'où des 422 sur toutes les connexions. Avec des annotations évaluées
+immédiatement, la question ne se pose pas.
+"""
 
 import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser
+from app.auth.rate_limit import limiter
 from app.auth.security import (
     TIMESTAMP_TOLERANCE_SECONDS,
     TOKEN_TYPE_REFRESH,
@@ -59,14 +70,19 @@ def _issue_token_pair(user_id: uuid.UUID, role: str, password_changed_at) -> Tok
 
 
 @router.post("/login", response_model=TokenPair, summary="Connexion")
+@limiter.limit(settings.login_rate_limit)
 def login(
     request: Request,
+    response: Response,
     db: DbSession,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> TokenPair:
     """Échange un couple identifiant/mot de passe contre une paire de jetons.
 
     Le champ `username` du formulaire OAuth2 reçoit l'adresse e-mail.
+
+    `response` n'est pas utilisé ici : slowapi s'en sert pour poser les en-têtes
+    `X-RateLimit-*`, qui indiquent au client le quota restant.
     """
     user = user_service.authenticate(db, form_data.username, form_data.password)
 
@@ -166,8 +182,9 @@ def change_password(
     response_model=MessageResponse,
     summary="Demande de réinitialisation",
 )
+@limiter.limit(settings.password_reset_rate_limit)
 def request_password_reset(
-    request: Request, db: DbSession, payload: PasswordResetRequest
+    request: Request, response: Response, db: DbSession, payload: PasswordResetRequest
 ) -> MessageResponse:
     """Génère un jeton de réinitialisation pour l'adresse indiquée.
 

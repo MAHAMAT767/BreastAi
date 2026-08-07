@@ -14,7 +14,15 @@ psycopg[binary]==3.2.3
 bcrypt==4.2.1
 pyjwt==2.10.1
 email-validator==2.2.0
+slowapi==0.1.9
 
-# Les dépendances IA (torch, torchvision, opencv, albumentations, pydicom,
-# grad-cam, onnxruntime) et PDF (reportlab) seront ajoutées aux phases 3 à 5
-# afin de garder l'image Docker légère pendant le scaffolding.
+# ---------- Imagerie (Phase 3) ----------
+numpy==2.2.1
+# Variante « headless » : la variante standard tire des bibliothèques GUI
+# (GTK, X11) inutiles et lourdes dans une image Docker serveur.
+opencv-python-headless==4.11.0.86
+pillow==11.1.0
+pydicom==3.0.1
+
+# Les dépendances IA (torch, torchvision, albumentations, grad-cam, onnxruntime)
+# et PDF (reportlab) seront ajoutées aux phases 4 et 5.
