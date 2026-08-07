@@ -23,6 +23,23 @@ numpy==2.2.1
 opencv-python-headless==4.11.0.86
 pillow==11.1.0
 pydicom==3.0.1
+# pydicom ne décode pas seul les transfer syntax compressées. Sans ces greffons,
+# un DICOM en JPEG Lossless ou JPEG 2000 — courant sur les mammographes — est
+# rejeté alors que le fichier est parfaitement valide.
+pylibjpeg==2.1.0
+pylibjpeg-libjpeg==2.3.0
+pylibjpeg-openjpeg==2.4.0
 
-# Les dépendances IA (torch, torchvision, albumentations, grad-cam, onnxruntime)
-# et PDF (reportlab) seront ajoutées aux phases 4 et 5.
+# ---------- Modèle (Phase 4) ----------
+# Sur Windows et macOS, les roues PyPI sont déjà des builds CPU. Sur Linux, la
+# roue PyPI embarque CUDA et pèse plus de 2 Go : l'image Docker installe donc
+# explicitement les roues CPU depuis download.pytorch.org avant ce fichier
+# (voir docker/Dockerfile.backend).
+torch==2.13.0
+torchvision==0.28.0
+
+# Grad-CAM est implémenté dans app/ai/explainability/ plutôt que via la
+# bibliothèque grad-cam : une trentaine de lignes de hooks, contre une
+# dépendance de plus à suivre.
+#
+# Les dépendances PDF (reportlab) seront ajoutées en Phase 5.

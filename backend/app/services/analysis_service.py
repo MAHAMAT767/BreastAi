@@ -1,7 +1,9 @@
 """Création et consultation des analyses de mammographies.
 
-Phase 3 : dépôt du fichier, validation, prétraitement, archivage. L'analyse reste
-au statut `pending` — l'inférence est branchée en Phase 4.
+Chaîne complète : dépôt → validation → prétraitement → inférence → Grad-CAM.
+L'inférence tourne de façon synchrone dans la requête. Sur CPU, EfficientNet-B0
+en 384×384 prend quelques centaines de millisecondes : acceptable pour un dépôt
+manuel, à repasser en tâche de fond si le volume augmente.
 """
 
 from __future__ import annotations
@@ -11,12 +13,17 @@ import uuid
 from pathlib import Path
 from typing import Final
 
+import torch
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
+from app.ai.explainability import GradCAM, locate_suspicious_region, overlay_heatmap
+from app.ai.explainability import encode_png as encode_overlay_png
+from app.ai.inference import Predictor, get_predictor
 from app.ai.preprocessing import (
     ALLOWED_EXTENSIONS,
     ImageLoadError,
+    PreprocessedImage,
     UnsupportedFormatError,
     encode_png,
     preprocess_for_inference,
@@ -30,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 ORIGINAL_FILENAME: Final[str] = "original"
 PROCESSED_FILENAME: Final[str] = "processed.png"
+GRADCAM_FILENAME: Final[str] = "gradcam.png"
 
 
 class UploadValidationError(Exception):
@@ -110,6 +118,7 @@ def create_from_upload(
         processed_image_path=processed_path,
         image_format=result.image_format.value,
         file_size_bytes=len(data),
+        preprocessing_version=result.version,
         status=AnalysisStatus.PENDING.value,
     )
     db.add(analysis)
@@ -123,7 +132,105 @@ def create_from_upload(
         result.image_format.value,
         result.duration_ms,
     )
+
+    return run_inference(db, analysis, preprocessed=result)
+
+
+# --------------------------------------------------------------------------- #
+# Inférence et explicabilité
+# --------------------------------------------------------------------------- #
+
+
+def _load_preprocessed(analysis: Analysis) -> PreprocessedImage:
+    """Reconstruit le tenseur d'entrée à partir du fichier d'origine archivé.
+
+    On repart de l'original et non de l'image traitée : c'est la seule façon de
+    profiter d'une correction du prétraitement lors d'une réexécution.
+    """
+    return preprocess_for_inference(storage_service.read_bytes(analysis.image_path))
+
+
+def run_inference(
+    db: Session,
+    analysis: Analysis,
+    *,
+    preprocessed: PreprocessedImage | None = None,
+    predictor: Predictor | None = None,
+) -> Analysis:
+    """Exécute la prédiction et le Grad-CAM, puis met l'analyse à jour.
+
+    Un échec n'interrompt pas le dépôt : l'analyse passe au statut `failed` avec
+    son message d'erreur, l'image reste archivée et l'inférence est rejouable.
+    Perdre une mammographie parce que le modèle a échoué serait bien pire que de
+    rendre une analyse sans prédiction.
+    """
+    analysis.status = AnalysisStatus.PROCESSING.value
+    analysis.error_message = None
+    db.commit()
+
+    try:
+        result = preprocessed or _load_preprocessed(analysis)
+        engine = predictor or get_predictor()
+        prediction = engine.predict(result.tensor)
+
+        class_index = engine.bundle.class_names.index(prediction.label)
+        batch = torch.from_numpy(result.tensor).unsqueeze(0).to(engine.bundle.device)
+
+        with GradCAM(engine.bundle.model, engine.bundle.target_layer) as gradcam:
+            cam = gradcam.compute(batch, class_index)
+
+        region = locate_suspicious_region(cam)
+        overlay = overlay_heatmap(result.display, cam, region=region)
+
+        directory = storage_service.analysis_directory(analysis.patient_id, analysis.id)
+        gradcam_path = storage_service.save_bytes(
+            directory, GRADCAM_FILENAME, encode_overlay_png(overlay)
+        )
+
+    except Exception as exc:  # noqa: BLE001 - toute défaillance doit être tracée, pas propagée
+        logger.exception("Échec de l'inférence sur l'analyse %s", analysis.id)
+        analysis.status = AnalysisStatus.FAILED.value
+        analysis.error_message = f"{type(exc).__name__}: {exc}"
+        db.commit()
+        db.refresh(analysis)
+        return analysis
+
+    analysis.status = AnalysisStatus.COMPLETED.value
+    analysis.prediction = prediction.label
+    analysis.probability = prediction.probability
+    analysis.confidence = prediction.confidence
+    analysis.inference_time_ms = prediction.inference_time_ms
+    analysis.model_version = prediction.model_version
+    analysis.preprocessing_version = result.version
+    analysis.gradcam_path = gradcam_path
+
+    if region is not None:
+        analysis.region_x = region.x
+        analysis.region_y = region.y
+        analysis.region_width = region.width
+        analysis.region_height = region.height
+
+    db.commit()
+    db.refresh(analysis)
+
+    logger.info(
+        "Analyse %s : %s (p=%.3f, %.0f ms, modèle %s).",
+        analysis.id,
+        prediction.label,
+        prediction.probability,
+        prediction.inference_time_ms,
+        prediction.model_version,
+    )
     return analysis
+
+
+def rerun_inference(db: Session, analysis: Analysis) -> Analysis:
+    """Rejoue l'inférence sur une analyse existante.
+
+    Utile après le remplacement du modèle : les analyses déjà rendues peuvent
+    être réévaluées sans redemander le cliché.
+    """
+    return run_inference(db, analysis)
 
 
 def get_by_id(db: Session, analysis_id: uuid.UUID) -> Analysis | None:

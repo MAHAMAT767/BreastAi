@@ -11,11 +11,23 @@ import uuid
 from datetime import date, datetime
 from typing import Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
+from app.ai.inference.loader import is_placeholder_version
 from app.auth.roles import UserRole
 from app.auth.security import MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH
-from app.disclaimer import MEDICAL_DISCLAIMER
+from app.disclaimer import (
+    GRADCAM_DISCLAIMER,
+    MEDICAL_DISCLAIMER,
+    PLACEHOLDER_MODEL_WARNING,
+)
 
 ItemT = TypeVar("ItemT")
 
@@ -166,6 +178,15 @@ class PatientRead(PatientBase):
 # --------------------------------------------------------------------------- #
 
 
+class SuspiciousRegionRead(BaseModel):
+    """Rectangle Grad-CAM, en pixels dans l'image prétraitée (384×384)."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+
 class AnalysisRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -176,20 +197,61 @@ class AnalysisRead(BaseModel):
     file_size_bytes: int | None = None
     status: str
 
-    #: Renseignés à partir de la Phase 4 seulement.
     prediction: str | None = None
+    #: Probabilité de la classe **maligne**, quelle que soit la classe prédite.
     probability: float | None = None
     confidence: float | None = None
     inference_time_ms: float | None = None
     model_version: str | None = None
+    preprocessing_version: str | None = None
     error_message: str | None = None
 
     doctor_comment: str | None = None
     doctor_validated: bool
     created_at: datetime
 
+    # ---------- Champs calculés ----------
+    #: Vrai tant qu'aucun modèle entraîné sur mammographies n'est déployé.
+    is_placeholder_model: bool = False
+    #: Renseigné uniquement dans ce cas, avec un texte sans ambiguïté.
+    model_warning: str | None = None
+    has_gradcam: bool = False
+    gradcam_disclaimer: str | None = None
+    suspicious_region: SuspiciousRegionRead | None = None
+
     #: Rappelé sur chaque analyse : le résultat ne vaut pas diagnostic.
     disclaimer: str = MEDICAL_DISCLAIMER
+
+    @model_validator(mode="after")
+    def _annotate_model_provenance(self) -> AnalysisRead:
+        """Dérive les avertissements du `model_version` enregistré.
+
+        La provenance est déduite de la valeur stockée, et non d'un état courant :
+        une analyse produite par le placeholder reste signalée comme telle même
+        après le déploiement d'un vrai modèle.
+        """
+        self.is_placeholder_model = is_placeholder_version(self.model_version)
+        if self.is_placeholder_model:
+            self.model_warning = PLACEHOLDER_MODEL_WARNING
+        if self.has_gradcam:
+            self.gradcam_disclaimer = GRADCAM_DISCLAIMER
+        return self
+
+    @classmethod
+    def from_analysis(cls, analysis: object) -> AnalysisRead:
+        """Construit la réponse en assemblant les champs dérivés de l'entité."""
+        read = cls.model_validate(analysis)
+        read.has_gradcam = bool(getattr(analysis, "gradcam_path", None))
+
+        if getattr(analysis, "region_width", None):
+            read.suspicious_region = SuspiciousRegionRead(
+                x=analysis.region_x,
+                y=analysis.region_y,
+                width=analysis.region_width,
+                height=analysis.region_height,
+            )
+
+        return cls._annotate_model_provenance(read)
 
 
 class AnalysisReview(BaseModel):

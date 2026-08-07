@@ -6,10 +6,12 @@ exercé de bout en bout, à travers le même endpoint que le frontend utilisera.
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai import CLASS_NAMES
 from app.ai.preprocessing import detect_format
 from app.config import settings
 from app.models.analysis import AnalysisStatus
@@ -21,6 +23,7 @@ from tests.conftest import DOCTOR_PASSWORD, auth_headers
 from tests.factories import (
     make_corrupted_png_bytes,
     make_dicom_bytes,
+    make_jpeg2000_dicom_bytes,
     make_jpeg_bytes,
     make_png16_bytes,
     make_png_bytes,
@@ -86,15 +89,19 @@ def test_upload_16bit_png(
     assert upload(client, doctor_headers, patient, make_png16_bytes()).status_code == 201
 
 
-def test_analysis_waits_for_inference(
+def test_upload_runs_inference_and_gradcam(
     client: TestClient, doctor_headers: dict[str, str], patient: Patient
 ) -> None:
-    """Le prétraitement est fait, mais le modèle n'est branché qu'en Phase 4."""
     body = upload(client, doctor_headers, patient, make_png_bytes()).json()
 
-    assert body["status"] == AnalysisStatus.PENDING.value
-    assert body["prediction"] is None
-    assert body["probability"] is None
+    assert body["status"] == AnalysisStatus.COMPLETED.value
+    assert body["prediction"] in CLASS_NAMES
+    assert 0.0 <= body["probability"] <= 1.0
+    assert 0.0 <= body["confidence"] <= 1.0
+    assert body["inference_time_ms"] > 0
+    assert body["model_version"]
+    assert body["preprocessing_version"]
+    assert body["has_gradcam"] is True
     assert body["doctor_validated"] is False
 
 
@@ -104,6 +111,84 @@ def test_analysis_response_carries_the_disclaimer(
     body = upload(client, doctor_headers, patient, make_png_bytes()).json()
 
     assert "ne remplacent pas l'avis" in body["disclaimer"]
+
+
+def test_placeholder_results_are_flagged_without_ambiguity(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    """Tant qu'aucun modèle n'est entraîné, aucun chiffre ne doit passer pour un résultat."""
+    body = upload(client, doctor_headers, patient, make_png_bytes()).json()
+
+    assert body["is_placeholder_model"] is True
+    assert body["model_version"].startswith("placeholder-")
+    assert "AUCUNE VALEUR CLINIQUE" in body["model_warning"]
+
+
+def test_gradcam_response_carries_its_own_caveat(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    """La carte dit où le modèle a regardé, pas où est une lésion."""
+    body = upload(client, doctor_headers, patient, make_png_bytes()).json()
+
+    assert "non l'emplacement d'une lésion" in body["gradcam_disclaimer"]
+
+
+def test_suspicious_region_is_returned_and_inside_the_image(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    body = upload(client, doctor_headers, patient, make_png_bytes()).json()
+    region = body["suspicious_region"]
+
+    assert region is not None
+    assert 0 <= region["x"] <= 384
+    assert 0 <= region["y"] <= 384
+    assert region["x"] + region["width"] <= 384
+    assert region["y"] + region["height"] <= 384
+
+
+def test_gradcam_image_is_served(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    analysis_id = upload(client, doctor_headers, patient, make_png_bytes()).json()["id"]
+
+    response = client.get(
+        f"{PREFIX}/analyses/{analysis_id}/image",
+        headers=doctor_headers,
+        params={"kind": "gradcam"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert detect_format(response.content) is not None
+
+
+def test_inference_can_be_replayed(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    """Prévu pour le remplacement du modèle : réévaluer sans redemander le cliché."""
+    first = upload(client, doctor_headers, patient, make_png_bytes()).json()
+
+    response = client.post(f"{PREFIX}/analyses/{first['id']}/infer", headers=doctor_headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == AnalysisStatus.COMPLETED.value
+    # Modèle inchangé et prétraitement déterministe : même prédiction.
+    assert body["prediction"] == first["prediction"]
+    assert body["probability"] == pytest.approx(first["probability"], abs=1e-5)
+
+
+def test_dicom_upload_produces_a_result(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    """Chaîne complète sur un DICOM compressé, du décodage au Grad-CAM."""
+    body = upload(
+        client, doctor_headers, patient, make_jpeg2000_dicom_bytes(), "cliche.dcm"
+    ).json()
+
+    assert body["status"] == AnalysisStatus.COMPLETED.value
+    assert body["image_format"] == "dicom"
+    assert body["has_gradcam"] is True
 
 
 def test_upload_is_audited(

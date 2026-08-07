@@ -23,9 +23,11 @@ from app.ai.preprocessing.loaders import to_uint8
 from tests.factories import (
     make_corrupted_png_bytes,
     make_dicom_bytes,
+    make_jpeg2000_dicom_bytes,
     make_jpeg_bytes,
     make_png16_bytes,
     make_png_bytes,
+    make_rle_dicom_bytes,
 )
 
 # --------------------------------------------------------------------------- #
@@ -103,6 +105,32 @@ def test_monochrome1_dicom_is_inverted() -> None:
     # Les deux jeux de pixels sont identiques ; seule l'interprétation diffère.
     assert not np.array_equal(monochrome1, monochrome2)
     assert np.allclose(monochrome1.astype(int) + monochrome2.astype(int), 255, atol=2)
+
+
+def test_loads_jpeg2000_compressed_dicom() -> None:
+    """La plupart des mammographes produisent du JPEG 2000, pas du non compressé."""
+    image, image_format = load_image(make_jpeg2000_dicom_bytes(height=200, width=160))
+
+    assert image_format is ImageFormat.DICOM
+    assert image.shape == (200, 160)
+    assert image.dtype == np.uint8
+
+
+def test_loads_rle_compressed_dicom() -> None:
+    image, image_format = load_image(make_rle_dicom_bytes(height=200, width=160))
+
+    assert image_format is ImageFormat.DICOM
+    assert image.shape == (200, 160)
+
+
+def test_compression_is_lossless_end_to_end() -> None:
+    """JPEG 2000 sans perte : le résultat doit être identique au non compressé."""
+    uncompressed, _ = load_image(make_dicom_bytes(height=120, width=100, seed=11))
+    compressed, _ = load_image(
+        make_jpeg2000_dicom_bytes(height=120, width=100, seed=11)
+    )
+
+    assert np.array_equal(uncompressed, compressed)
 
 
 def test_unsupported_format_is_rejected() -> None:

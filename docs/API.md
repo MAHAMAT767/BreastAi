@@ -74,7 +74,8 @@ est logique : les analyses déjà rendues restent rattachées, un compte rendu r
 | `POST` | `/analyses` | Déposer une mammographie (`multipart` : `patient_id`, `file`). |
 | `GET` | `/analyses` | Lister — `patient_id`, `limit`, `offset`. |
 | `GET` | `/analyses/{id}` | Consulter une analyse. |
-| `GET` | `/analyses/{id}/image` | Image `processed` (défaut) ou `original`. |
+| `GET` | `/analyses/{id}/image` | Image `processed` (défaut), `original` ou `gradcam`. |
+| `POST` | `/analyses/{id}/infer` | Rejouer l'inférence sur le cliché archivé. |
 | `PATCH` | `/analyses/{id}/review` | Commentaire et validation du médecin. |
 
 ### Validation d'un dépôt
@@ -97,8 +98,93 @@ analyse pointant vers des fichiers inexistants serait pire qu'une analyse absent
 
 Pour le DICOM : la VOI LUT du constructeur est appliquée et les images
 `MONOCHROME1` sont inversées. Les images 12 ou 16 bits sont ramenées sur 8 bits.
+Les transfer syntax compressées (JPEG Lossless, JPEG 2000, RLE) sont décodées via
+`pylibjpeg`.
 
-Le statut reste `pending` : l'inférence arrive en Phase 4.
+La version de la chaîne est enregistrée dans `preprocessing_version` : sans elle,
+impossible de savoir a posteriori si une analyse ancienne est comparable à une
+analyse récente.
+
+### Inférence
+
+L'inférence tourne de façon synchrone dans la requête de dépôt : entre 500 et
+1500 ms par analyse sur CPU. L'analyse passe `pending` → `processing` →
+`completed`. Un échec du modèle met le statut à `failed` avec `error_message` :
+l'image reste archivée et l'inférence reste rejouable, car perdre une
+mammographie parce que le modèle a échoué serait bien pire que rendre une analyse
+sans prédiction.
+
+| Champ | Sens |
+|-------|------|
+| `prediction` | `benign` ou `malignant` |
+| `probability` | Probabilité de la classe **maligne**, quelle que soit la classe prédite |
+| `confidence` | Probabilité de la classe effectivement prédite |
+| `inference_time_ms` | Durée du passage avant |
+| `model_version` | Modèle ayant produit ce résultat |
+
+Le seuil de décision vient du modèle, pas d'un `0.5` codé en dur : en dépistage,
+il se règle sur la sensibilité voulue.
+
+> ### ⛔ Modèle actuellement déployé : placeholder sans valeur clinique
+>
+> Aucun jeu de mammographies annotées n'étant disponible, le modèle chargé est un
+> EfficientNet-B0 à **poids ImageNet**, dont la tête de classification est
+> initialisée au hasard (avec une graine fixe, pour que les sorties soient au
+> moins reproductibles). **Il n'a jamais vu de mammographie.**
+>
+> Ses prédictions, probabilités et cartes Grad-CAM sont des valeurs arbitraires.
+> Elles ne servent qu'à valider la chaîne technique de bout en bout.
+>
+> Toute réponse concernée porte :
+> - `is_placeholder_model: true`
+> - `model_version` préfixé par `placeholder-`
+> - `model_warning` avec un texte explicite
+>
+> Le préfixe est stocké en base : une analyse produite par le placeholder reste
+> reconnaissable comme telle même après le déploiement d'un vrai modèle.
+
+### Remplacer le modèle
+
+Déposer un checkpoint dans `MODEL_PATH`. Aucune autre modification n'est
+nécessaire — ni dans l'inférence, ni dans les services, ni dans l'API.
+
+```python
+torch.save(
+    {
+        "architecture": "efficientnet_b0",     # ou efficientnet_b3
+        "class_names": ["benign", "malignant"],
+        "preprocessing_version": "v1",
+        "threshold": 0.5,
+        "version": "efficientnet_b0-cbis-ddsm-v1",
+        "state_dict": model.state_dict(),
+    },
+    "models/breastai_efficientnet.pt",
+)
+```
+
+Les métadonnées sont **vérifiées** au chargement et un écart fait échouer le
+démarrage. C'est délibéré : un ordre de classes inversé ou un prétraitement
+différent produirait des prédictions silencieusement fausses, ce qui est bien
+pire qu'un service qui refuse de démarrer. Le préfixe `placeholder-` est refusé
+pour un modèle entraîné, afin que ce marqueur de provenance reste fiable.
+
+`POST /analyses/{id}/infer` rejoue l'inférence sur une analyse existante, à
+partir du cliché archivé : les analyses déjà rendues peuvent être réévaluées
+après remplacement du modèle, sans redemander la mammographie.
+
+### Grad-CAM
+
+La carte est calculée sur la dernière couche convolutive pour la classe prédite,
+puis superposée à l'image prétraitée — celle **vue par le modèle**, et non
+l'originale : afficher la carte sur un autre support laisserait croire à une
+correspondance géométrique qui n'existe pas.
+
+`suspicious_region` donne le rectangle englobant la zone la plus activée, en
+pixels dans l'image 384×384.
+
+> La carte indique **où le modèle a regardé**, pas où se trouve une lésion. Un
+> modèle qui se trompe produit une carte tout aussi nette qu'un modèle qui a
+> raison. Ce rappel est renvoyé dans `gradcam_disclaimer`.
 
 ### Accès aux images
 
@@ -163,6 +249,11 @@ partager un unique quota à tous les utilisateurs.
 | Compteurs de quota en mémoire | Quota multiplié par le nombre d'instances (voir l'encadré ci-dessus) | avant déploiement |
 | `logout` ne révoque pas le jeton | Le client doit l'effacer ; changer le mot de passe coupe toutes les sessions | — |
 | `EmailStr` refuse les TLD réservés | Une adresse en `.local` interne serait rejetée | à arbitrer |
-| DICOM compressés non pris en charge | Sans `pylibjpeg` ni `gdcm`, un DICOM en JPEG/JPEG2000 est rejeté en `422` | à arbitrer |
+| Modèle placeholder | Aucune valeur clinique — voir l'encadré ci-dessus | dès qu'un dataset annoté est disponible |
+| JPEG-LS non pris en charge | Nécessite `pyjpegls`, non installé. JPEG Lossless, JPEG 2000 et RLE fonctionnent | à arbitrer |
 | Stockage sur disque local, non chiffré | Les mammographies ne sont ni sauvegardées ni chiffrées au repos | avant déploiement |
+| Inférence synchrone | 500 à 1500 ms ajoutés à chaque dépôt | si le volume augmente |
 | Taille lue en mémoire avant contrôle | Un fichier de 50 Mo est intégralement chargé avant d'être mesuré | 8 |
+
+L'ensemble des points à traiter avant une exposition à des patientes réelles est
+rassemblé dans [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md).

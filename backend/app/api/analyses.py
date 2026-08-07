@@ -95,7 +95,7 @@ async def upload_analysis(
         resource_id=str(analysis.id),
         request=request,
     )
-    return AnalysisRead.model_validate(analysis)
+    return AnalysisRead.from_analysis(analysis)
 
 
 @router.get("", response_model=Page[AnalysisRead], summary="Lister les analyses")
@@ -111,7 +111,7 @@ def list_analyses(
         db, patient_id=patient_id, limit=limit, offset=offset
     )
     return Page[AnalysisRead](
-        items=[AnalysisRead.model_validate(analysis) for analysis in analyses],
+        items=[AnalysisRead.from_analysis(analysis) for analysis in analyses],
         total=analysis_service.count_analyses(db, patient_id=patient_id),
         limit=limit,
         offset=offset,
@@ -131,7 +131,7 @@ def get_analysis(
         resource_id=str(analysis.id),
         request=request,
     )
-    return AnalysisRead.model_validate(analysis)
+    return AnalysisRead.from_analysis(analysis)
 
 
 @router.get(
@@ -144,8 +144,8 @@ def get_analysis_image(
     db: DbSession,
     user: ClinicalUser,
     kind: Annotated[
-        Literal["original", "processed"],
-        Query(description="Image déposée ou image prétraitée."),
+        Literal["original", "processed", "gradcam"],
+        Query(description="Image déposée, image prétraitée, ou superposition Grad-CAM."),
     ] = "processed",
 ) -> Response:
     """Sert l'image d'une analyse.
@@ -156,18 +156,51 @@ def get_analysis_image(
     del user
     analysis = _get_or_404(db, analysis_id)
 
-    relative_path = analysis.image_path if kind == "original" else analysis.processed_image_path
+    paths = {
+        "original": analysis.image_path,
+        "processed": analysis.processed_image_path,
+        "gradcam": analysis.gradcam_path,
+    }
+    relative_path = paths[kind]
     if not relative_path or not storage_service.exists(relative_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Image indisponible."
         )
 
-    media_type = "image/png" if kind == "processed" else "application/octet-stream"
+    media_type = "application/octet-stream" if kind == "original" else "image/png"
     return Response(
         content=storage_service.read_bytes(relative_path),
         media_type=media_type,
         headers={"Cache-Control": "private, no-store"},
     )
+
+
+@router.post(
+    "/{analysis_id}/infer",
+    response_model=AnalysisRead,
+    summary="Rejouer l'inférence",
+)
+def rerun_inference(
+    analysis_id: uuid.UUID, request: Request, db: DbSession, user: ClinicalUser
+) -> AnalysisRead:
+    """Relance le modèle sur une analyse déjà déposée.
+
+    Prévu pour le remplacement du modèle : les analyses existantes peuvent être
+    réévaluées à partir du cliché archivé, sans redemander la mammographie.
+    """
+    analysis = _get_or_404(db, analysis_id)
+    analysis = analysis_service.rerun_inference(db, analysis)
+
+    audit_service.record(
+        db,
+        AuditAction.ANALYSIS_CREATE,
+        user_id=user.id,
+        resource_type="analysis",
+        resource_id=str(analysis.id),
+        request=request,
+        detail="Inférence rejouée",
+    )
+    return AnalysisRead.from_analysis(analysis)
 
 
 @router.patch(
@@ -191,4 +224,4 @@ def review_analysis(
         comment=payload.doctor_comment,
         validated=payload.doctor_validated,
     )
-    return AnalysisRead.model_validate(analysis)
+    return AnalysisRead.from_analysis(analysis)

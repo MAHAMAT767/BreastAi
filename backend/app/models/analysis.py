@@ -97,7 +97,19 @@ class Analysis(Base, TimestampMixin):
     confidence: Mapped[float | None] = mapped_column(Float)
     inference_time_ms: Mapped[float | None] = mapped_column(Float)
     model_version: Mapped[str | None] = mapped_column(String(100))
+    #: Version de la chaîne de prétraitement ayant produit les images stockées.
+    #: Sans elle, impossible de savoir a posteriori si une analyse ancienne est
+    #: comparable à une analyse récente.
+    preprocessing_version: Mapped[str | None] = mapped_column(String(20))
     error_message: Mapped[str | None] = mapped_column(Text)
+
+    # ---------- Zone saillante Grad-CAM ----------
+    #: Rectangle englobant, en pixels dans l'image prétraitée. Il indique où le
+    #: modèle a regardé, pas où se trouve une lésion.
+    region_x: Mapped[int | None] = mapped_column(Integer)
+    region_y: Mapped[int | None] = mapped_column(Integer)
+    region_width: Mapped[int | None] = mapped_column(Integer)
+    region_height: Mapped[int | None] = mapped_column(Integer)
 
     # ---------- Lecture médicale ----------
     #: Le médecin confirme ou infirme la sortie du modèle. C'est cette lecture,
