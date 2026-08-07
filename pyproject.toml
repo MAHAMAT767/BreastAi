@@ -1,14 +1,18 @@
 [tool.pytest.ini_options]
 # Les tests vivent à la racine (tests/) mais importent le paquet `app`
 # qui se trouve dans backend/.
-pythonpath = ["backend"]
+pythonpath = ["backend", "."]
 testpaths = ["tests"]
 addopts = "-q"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 src = ["backend"]
+# Les fichiers de révision sont produits par `alembic revision --autogenerate` :
+# les reformater à la main créerait du bruit à chaque nouvelle migration.
+extend-exclude = ["backend/app/database/migrations/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

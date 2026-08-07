@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1
+# Image de l'API BreastAI. Contexte de build : racine du dépôt.
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# libpq est requis par psycopg ; curl sert au healthcheck de compose.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y libpq5 curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Les dépendances sont copiées seules pour que le cache de couche survive
+# aux modifications du code applicatif.
+COPY backend/requirements.txt backend/requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+COPY backend/ ./
+
+# L'API ne tourne pas en root.
+RUN useradd --create-home --uid 1000 breastai \
+    && mkdir -p /app/uploads \
+    && chown -R breastai:breastai /app
+USER breastai
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
