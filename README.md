@@ -150,7 +150,7 @@ cd frontend && npm test
 
 - [x] **Phase 1** — Scaffolding, docker-compose, README
 - [x] **Phase 2** — Auth JWT, modèles SQLAlchemy (User, Patient, Analysis), migrations Alembic
-- [ ] **Phase 3** — CRUD patients, upload mammographies (DICOM/PNG/JPG), prétraitement
+- [x] **Phase 3** — CRUD patients, upload mammographies (DICOM/PNG/JPG), prétraitement
 - [ ] **Phase 4** — Inférence EfficientNet + Grad-CAM
 - [ ] **Phase 5** — Génération de rapports PDF
 - [ ] **Phase 6** — Frontend React complet + tableau de bord Recharts

@@ -11,18 +11,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api.router import api_router
+from app.auth.rate_limit import install_rate_limiting
 from app.config import settings
+from app.disclaimer import MEDICAL_DISCLAIMER
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("breastai")
-
-MEDICAL_DISCLAIMER = (
-    "BreastAI est un outil d'aide à la décision. Ses résultats ne constituent pas "
-    "un diagnostic et ne remplacent pas l'avis d'un professionnel de santé qualifié."
-)
 
 
 @asynccontextmanager
@@ -43,6 +40,8 @@ def create_app() -> FastAPI:
         ),
         lifespan=lifespan,
     )
+
+    install_rate_limiting(app)
 
     app.add_middleware(
         CORSMiddleware,

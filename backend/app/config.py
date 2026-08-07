@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     password_reset_token_expire_minutes: int = 30
 
+    # ---------- Limitation de débit ----------
+    #: Désactivable pour les tests. Le stockage est en mémoire, par processus :
+    #: voir la réserve multi-instance dans app/auth/rate_limit.py.
+    rate_limit_enabled: bool = True
+    login_rate_limit: str = "10/minute"
+    password_reset_rate_limit: str = "5/minute"
+
     # ---------- Compte administrateur initial ----------
     # Utilisé une seule fois par `python -m app.database.init_db`.
     first_admin_email: str | None = None
