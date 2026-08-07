@@ -1,0 +1,52 @@
+# ---------- Secrets ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Données de santé : ne JAMAIS versionner ----------
+datasets/**
+!datasets/.gitkeep
+!datasets/README.md
+models/**
+!models/.gitkeep
+!models/README.md
+reports/**
+!reports/.gitkeep
+!reports/README.md
+backend/uploads/
+*.dcm
+*.dicom
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.pt
+*.pth
+*.onnx
+
+# ---------- Node ----------
+node_modules/
+dist/
+.vite/
+coverage/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ---------- Notebooks ----------
+.ipynb_checkpoints/
+
+# ---------- Outils / OS ----------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

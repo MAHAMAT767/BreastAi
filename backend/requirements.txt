@@ -1,0 +1,20 @@
+# ---------- API ----------
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.5
+pydantic-settings==2.7.1
+python-multipart==0.0.20
+
+# ---------- Base de données (Phase 2) ----------
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+
+# ---------- Sécurité (Phase 2) ----------
+bcrypt==4.2.1
+pyjwt==2.10.1
+email-validator==2.2.0
+
+# Les dépendances IA (torch, torchvision, opencv, albumentations, pydicom,
+# grad-cam, onnxruntime) et PDF (reportlab) seront ajoutées aux phases 3 à 5
+# afin de garder l'image Docker légère pendant le scaffolding.
