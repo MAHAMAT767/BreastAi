@@ -41,5 +41,6 @@ torchvision==0.28.0
 # Grad-CAM est implémenté dans app/ai/explainability/ plutôt que via la
 # bibliothèque grad-cam : une trentaine de lignes de hooks, contre une
 # dépendance de plus à suivre.
-#
-# Les dépendances PDF (reportlab) seront ajoutées en Phase 5.
+
+# ---------- Rapports PDF (Phase 5) ----------
+reportlab==4.2.5

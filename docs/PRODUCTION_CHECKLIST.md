@@ -28,7 +28,7 @@ Statut : ⛔ bloquant · ⚠️ à traiter · 📋 à documenter
 
 | | Point | Situation actuelle |
 |---|-------|--------------------|
-| ⛔ | **Stockage des images non chiffré** | Les mammographies et les images Grad-CAM sont écrites en clair sur le disque local du conteneur (`app/services/storage_service.py`). Ni chiffrées au repos, ni sauvegardées. À remplacer par un stockage objet chiffré, avec accès contrôlé et journalisé. |
+| ⛔ | **Stockage des images non chiffré** | Les mammographies, les images Grad-CAM et les rapports PDF — qui contiennent l'identité de la patiente — sont écrits en clair sur le disque local du conteneur (`app/services/storage_service.py`). Ni chiffrés au repos, ni sauvegardés. À remplacer par un stockage objet chiffré, avec accès contrôlé et journalisé. |
 | ⛔ | Chiffrement des données patients en base | Nom, date de naissance, antécédents et téléphone sont stockés en clair. À chiffrer au niveau colonne, ou à défaut chiffrer le volume. |
 | ⛔ | Sauvegardes chiffrées et restauration testée | Aucune sauvegarde configurée. Une sauvegarde jamais restaurée n'est pas une sauvegarde. |
 | ⚠️ | Purge et durée de conservation | Aucune politique définie. La suppression des dossiers est logique : rien n'est jamais réellement effacé. |
@@ -46,6 +46,8 @@ Statut : ⛔ bloquant · ⚠️ à traiter · 📋 à documenter
 | ⚠️ | Envoi des e-mails de réinitialisation | Le jeton est actuellement écrit dans les journaux du serveur. |
 | ⚠️ | Taille des dépôts contrôlée en flux | Un fichier est entièrement chargé en mémoire avant d'être mesuré : N dépôts simultanés de 50 Mo saturent la mémoire du processus. |
 | ⚠️ | Origine des checkpoints maîtrisée | `torch.load` désérialise du pickle : un fichier `.pt` hostile exécute du code arbitraire au chargement. Ne charger que des modèles produits en interne. |
+| ⚠️ | **Signature des rapports sans valeur probante** | L'empreinte HMAC-SHA256 imprimée sur les comptes rendus détecte une altération, mais ne constitue pas une signature électronique qualifiée : ni certificat, ni autorité, ni horodatage opposable. Pour une valeur juridique, passer à une signature PAdES (eIDAS) avec certificat du praticien ou de l'établissement. |
+| ⚠️ | Rotation de `SECRET_KEY` | La clé sert aussi à signer les rapports : la changer invalide l'empreinte de **tous** les rapports déjà émis. Prévoir un versionnement des clés avant toute rotation. |
 | 📋 | Journaux sans données patients | Vérifié par construction, à revalider à chaque phase. |
 | 📋 | Revue des dépendances | `pip-audit` / `npm audit` dans la CI (Phase 8). |
 
@@ -63,6 +65,7 @@ Statut : ⛔ bloquant · ⚠️ à traiter · 📋 à documenter
 | | Point | Situation actuelle |
 |---|-------|--------------------|
 | ⛔ | Avertissement médical visible sur chaque écran de résultat | Présent côté API (`disclaimer`, `model_warning`, `gradcam_disclaimer`). À rendre impossible à manquer côté frontend en Phase 6. |
-| ⛔ | Aucun résultat placeholder montré à une patiente | Tant que `is_placeholder_model` vaut `true`, aucune sortie ne doit quitter le cadre technique. |
+| ⛔ | Aucun résultat placeholder montré à une patiente | Tant que `is_placeholder_model` vaut `true`, aucune sortie ne doit quitter le cadre technique. Les rapports PDF portent bandeau et filigrane sur chaque page dans ce cas. |
+| ⚠️ | Devenir des rapports imprimés | Un PDF sorti de l'application n'est plus contrôlé : ni révocable, ni traçable. Définir qui peut exporter, et ce qu'il advient des copies. |
 | ⚠️ | Formation des utilisateurs | Ce qu'est une carte Grad-CAM, ce qu'elle n'est pas, et comment lire une probabilité. |
 | 📋 | Traçabilité de la lecture médicale | `doctor_validated` et `doctor_comment` existent ; leur usage doit être inscrit dans le protocole de service. |

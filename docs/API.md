@@ -77,6 +77,9 @@ est logique : les analyses déjà rendues restent rattachées, un compte rendu r
 | `GET` | `/analyses/{id}/image` | Image `processed` (défaut), `original` ou `gradcam`. |
 | `POST` | `/analyses/{id}/infer` | Rejouer l'inférence sur le cliché archivé. |
 | `PATCH` | `/analyses/{id}/review` | Commentaire et validation du médecin. |
+| `GET` | `/analyses/{id}/report` | Télécharger le compte rendu PDF (produit à la demande). |
+| `POST` | `/analyses/{id}/report` | Régénérer le rapport, renvoie l'empreinte. |
+| `GET` | `/analyses/{id}/report/verify` | Contrôler l'empreinte du rapport archivé. |
 
 ### Validation d'un dépôt
 
@@ -195,6 +198,54 @@ portent `Cache-Control: private, no-store`.
 Les chemins de stockage sont construits uniquement à partir d'UUID générés par le
 serveur. Le nom de fichier fourni par le client est désinfecté et conservé pour
 l'affichage seul — il n'entre jamais dans la construction d'un chemin.
+
+## Rapport PDF
+
+`GET /analyses/{id}/report` produit le compte rendu s'il n'existe pas encore, puis
+le sert. Réservé aux analyses **terminées** : un compte rendu sans résultat n'a
+pas d'objet, et en produire un laisserait croire qu'une lecture a eu lieu (`409`).
+
+Contenu : identité patient et antécédents, données de l'examen, résultat chiffré,
+image d'origine décodée, superposition Grad-CAM, synthèse automatique, lecture du
+médecin, avertissement médical, bloc de signature. Pagination et pied de page sur
+chaque page.
+
+### Avertissement placeholder sur le document
+
+Tant que `model_version` porte le préfixe `placeholder-`, le rapport reçoit un
+traitement **plus visible que l'API** :
+
+- un bandeau rouge en tête de la première page, avant toute autre information ;
+- un **filigrane diagonal répété sur chaque page** : `MODELE DE DEMONSTRATION - SANS VALEUR CLINIQUE` ;
+- aucune synthèse automatique n'est rédigée — décrire un cliché à partir de
+  sorties arbitraires serait pire que se taire.
+
+Un rapport imprimé circule hors de l'application : il est transmis, photocopié,
+photographié. Il doit se dénoncer seul, sans dépendre du contexte dans lequel il
+a été produit. Ces éléments disparaissent d'eux-mêmes dès qu'un modèle entraîné
+est déployé, sans intervention.
+
+### Signature
+
+Empreinte **HMAC-SHA256** dérivée de `SECRET_KEY`, imprimée sur le document et
+stockée dans `report_signature`. Elle couvre :
+
+`analysis_id · code patient · prédiction · probabilité · model_version ·
+preprocessing_version · commentaire du médecin · validation · date d'établissement`
+
+La lecture médicale est couverte au même titre que la sortie du modèle : c'est
+elle qui fait foi cliniquement, et c'est elle qu'un tiers aurait le plus
+d'intérêt à modifier.
+
+`GET /analyses/{id}/report/verify` recalcule l'empreinte et la compare, en temps
+constant. Si le dossier a été révisé depuis, la vérification échoue et le rapport
+doit être régénéré — c'est le comportement voulu.
+
+> **Ce n'est pas une signature électronique qualifiée.** Il n'y a ni certificat,
+> ni autorité de certification, ni horodatage opposable. L'empreinte détecte
+> qu'un rapport ne correspond plus à l'analyse enregistrée ; elle n'a aucune
+> valeur probante face à un tiers. Une signature PAdES/eIDAS relève de la
+> checklist avant production.
 
 ## Limitation de débit
 

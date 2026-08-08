@@ -159,7 +159,7 @@ cd frontend && npm test
 - [x] **Phase 2** — Auth JWT, modèles SQLAlchemy (User, Patient, Analysis), migrations Alembic
 - [x] **Phase 3** — CRUD patients, upload mammographies (DICOM/PNG/JPG), prétraitement
 - [x] **Phase 4** — Inférence EfficientNet + Grad-CAM *(modèle placeholder — voir l'avertissement)*
-- [ ] **Phase 5** — Génération de rapports PDF
+- [x] **Phase 5** — Génération de rapports PDF
 - [ ] **Phase 6** — Frontend React complet + tableau de bord Recharts
 - [ ] **Phase 7** — Assistant IA conversationnel avec disclaimer médical
 - [ ] **Phase 8** — Historique, recherche, tests end-to-end, CI
