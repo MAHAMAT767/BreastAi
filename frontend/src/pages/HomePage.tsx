@@ -1,32 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 
-import MedicalDisclaimer from '@/components/MedicalDisclaimer';
+import { buttonClasses } from '@/components/ui';
+import { useAuth } from '@/contexts/AuthContext';
 import { getHealth } from '@/lib/api';
+import { CLINICAL_ROLES } from '@/types';
 
-/** Étapes du pipeline, affichées telles quelles jusqu'à leur implémentation. */
+/** Étapes du pipeline. Celles qui ne sont pas encore accessibles sont marquées. */
 const PIPELINE = [
-  'Upload',
-  'Prétraitement',
-  'EfficientNet',
-  'Classification',
-  'Grad-CAM',
-  'Rapport PDF',
+  { label: 'Upload', ready: true },
+  { label: 'Prétraitement', ready: true },
+  { label: 'EfficientNet', ready: true },
+  { label: 'Grad-CAM', ready: true },
+  { label: 'Rapport PDF', ready: true },
+  { label: 'Assistant IA', ready: false },
 ];
 
 function ApiStatus() {
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['health'],
-    queryFn: getHealth,
-  });
+  const { data, isPending, isError } = useQuery({ queryKey: ['health'], queryFn: getHealth });
 
-  if (isPending) {
-    return <span className="text-slate-500">Connexion à l'API…</span>;
-  }
-
+  if (isPending) return <span className="text-slate-500">Connexion à l'API…</span>;
   if (isError) {
     return (
       <span className="text-malignant">
-        API injoignable — vérifiez que le backend tourne sur le port 8000.
+        API injoignable — vérifiez que le backend est démarré.
       </span>
     );
   }
@@ -39,47 +36,63 @@ function ApiStatus() {
 }
 
 export default function HomePage() {
+  const { user, hasRole } = useAuth();
+
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
-      <header className="mb-10">
-        <h1 className="text-4xl font-bold tracking-tight text-brand-700">BreastAI</h1>
-        <p className="mt-2 text-lg text-slate-600">
-          Aide au dépistage du cancer du sein par intelligence artificielle.
+    <section className="space-y-8">
+      <header>
+        <h1 className="text-2xl font-bold text-slate-900">
+          Bonjour {user?.full_name ?? ''}
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Plateforme d'aide au dépistage du cancer du sein.
         </p>
       </header>
 
-      <section className="mb-8 rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          État du système
-        </h2>
-        <p className="text-sm">
-          <ApiStatus />
-        </p>
-      </section>
+      {hasRole(...CLINICAL_ROLES) && (
+        <div className="flex flex-wrap gap-3">
+          <Link to="/patients" className={buttonClasses('primary')}>
+            Consulter les patients
+          </Link>
+          <Link to="/patients/nouveau" className={buttonClasses('secondary')}>
+            Créer un dossier
+          </Link>
+        </div>
+      )}
 
-      <section className="mb-8 rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Pipeline d'analyse
-        </h2>
-        <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-700">
-          {PIPELINE.map((step, index) => (
-            <li key={step} className="flex items-center gap-2">
-              <span className="rounded bg-brand-50 px-2 py-1 font-medium text-brand-700">
-                {step}
-              </span>
-              {index < PIPELINE.length - 1 && <span aria-hidden="true">→</span>}
-            </li>
-          ))}
-        </ol>
-      </section>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            État du système
+          </h2>
+          <p className="text-sm">
+            <ApiStatus />
+          </p>
+        </section>
 
-      <MedicalDisclaimer />
-
-      <footer className="mt-12 border-t border-slate-200 pt-6 text-sm text-slate-500">
-        <p>
-          Dédié à la mémoire de <strong className="text-slate-700">Mouna Abakar</strong>.
-        </p>
-      </footer>
-    </main>
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Pipeline d'analyse
+          </h2>
+          <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-700">
+            {PIPELINE.map((step, index) => (
+              <li key={step.label} className="flex items-center gap-2">
+                <span
+                  className={
+                    step.ready
+                      ? 'rounded bg-brand-50 px-2 py-1 font-medium text-brand-700'
+                      : 'rounded bg-slate-100 px-2 py-1 font-medium text-slate-400'
+                  }
+                  title={step.ready ? undefined : 'À venir'}
+                >
+                  {step.label}
+                </span>
+                {index < PIPELINE.length - 1 && <span aria-hidden="true">→</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    </section>
   );
 }

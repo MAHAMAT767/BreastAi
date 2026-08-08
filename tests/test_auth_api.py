@@ -11,7 +11,7 @@ from app.config import settings
 from app.models.audit_log import AuditAction, AuditLog
 from app.models.user import User
 from app.services import user_service
-from tests.conftest import ADMIN_PASSWORD, DOCTOR_PASSWORD, login
+from tests.conftest import ADMIN_PASSWORD, DOCTOR_PASSWORD, auth_headers, login
 
 PREFIX = settings.api_v1_prefix
 
@@ -97,6 +97,28 @@ def test_me_returns_profile_without_password(
     assert body["role"] == "doctor"
     assert "hashed_password" not in body
     assert "password" not in body
+
+
+def test_me_works_for_an_internal_domain_account(client: TestClient, db: Session) -> None:
+    """Un compte sur un domaine interne doit pouvoir lire son profil.
+
+    `.local` est un domaine à usage réservé, refusé par `EmailStr`. Tant que les
+    schémas de sortie le revalidaient, un tel compte — typique du réseau d'un
+    établissement de soins, et créé tel quel par `init_db` — pouvait se
+    connecter mais recevait un 500 sur `/auth/me`.
+    """
+    user_service.create_user(
+        db,
+        email="admin@hopital.local",
+        password="MotDePasseInterne-2026",
+        full_name="Admin Interne",
+    )
+    headers = auth_headers(client, "admin@hopital.local", "MotDePasseInterne-2026")
+
+    response = client.get(f"{PREFIX}/auth/me", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "admin@hopital.local"
 
 
 def test_me_requires_a_token(client: TestClient) -> None:

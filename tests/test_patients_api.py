@@ -81,6 +81,24 @@ def test_unknown_sex_is_refused(client: TestClient, doctor_headers: dict[str, st
     assert response.status_code == 422
 
 
+def test_patient_with_an_internal_domain_email_can_be_read(
+    client: TestClient, db: Session, doctor_headers: dict[str, str]
+) -> None:
+    """Un dossier ne doit pas devenir illisible à cause d'une adresse interne."""
+    from app.services import patient_service
+
+    patient = patient_service.create_patient(
+        db, code="TCD-2026-LOCAL", first_name="Test", last_name="Interne"
+    )
+    patient.email = "contact@hopital.local"
+    db.commit()
+
+    response = client.get(f"{PREFIX}/patients/{patient.id}", headers=doctor_headers)
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "contact@hopital.local"
+
+
 def test_male_patient_is_accepted(client: TestClient, doctor_headers: dict[str, str]) -> None:
     """Le cancer du sein masculin est rare mais réel."""
     response = client.post(

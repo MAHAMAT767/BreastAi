@@ -48,6 +48,8 @@ Statut : ⛔ bloquant · ⚠️ à traiter · 📋 à documenter
 | ⚠️ | Origine des checkpoints maîtrisée | `torch.load` désérialise du pickle : un fichier `.pt` hostile exécute du code arbitraire au chargement. Ne charger que des modèles produits en interne. |
 | ⚠️ | **Signature des rapports sans valeur probante** | L'empreinte HMAC-SHA256 imprimée sur les comptes rendus détecte une altération, mais ne constitue pas une signature électronique qualifiée : ni certificat, ni autorité, ni horodatage opposable. Pour une valeur juridique, passer à une signature PAdES (eIDAS) avec certificat du praticien ou de l'établissement. |
 | ⚠️ | Rotation de `SECRET_KEY` | La clé sert aussi à signer les rapports : la changer invalide l'empreinte de **tous** les rapports déjà émis. Prévoir un versionnement des clés avant toute rotation. |
+| ⚠️ | **Jetons accessibles au JavaScript** | Le frontend conserve les jetons dans `sessionStorage` (`frontend/src/lib/tokens.ts`) : ils disparaissent à la fermeture de l'onglet, ce qui limite l'exposition sur un poste partagé, mais restent volables par une faille XSS. La solution correcte est un cookie `HttpOnly` posé et lu par le backend. |
+| 📋 | Politique de sécurité de contenu (CSP) | Aucune n'est définie. Une CSP stricte réduit fortement la portée d'une injection, ce qui compte d'autant plus tant que les jetons sont en `sessionStorage`. |
 | 📋 | Journaux sans données patients | Vérifié par construction, à revalider à chaque phase. |
 | 📋 | Revue des dépendances | `pip-audit` / `npm audit` dans la CI (Phase 8). |
 

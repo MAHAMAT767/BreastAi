@@ -149,9 +149,26 @@ alembic check                                      # dérive modèles / schéma
 pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 pytest
 
-# Frontend
+# Frontend — composants, avec API simulée
 cd frontend && npm test
 ```
+
+### Tests d'intégration du frontend
+
+`frontend/src/integration/` fait tourner les composants contre l'**API réelle**,
+sans simulation de `fetch`. Ils détectent les écarts qu'un faux serveur masque
+par construction : nom d'un champ, forme d'une réponse d'erreur, encodage du
+formulaire de connexion.
+
+```bash
+# Backend démarré, base migrée, compte administrateur créé.
+# LOGIN_RATE_LIMIT est relevé : le quota par défaut de 10/minute est dépassé
+# par deux exécutions rapprochées de la suite.
+cd frontend && npm run test:integration
+```
+
+Ils s'ignorent d'eux-mêmes si l'API n'est pas joignable, pour ne pas transformer
+une absence de backend en échec de tests.
 
 ## Feuille de route
 
@@ -160,7 +177,8 @@ cd frontend && npm test
 - [x] **Phase 3** — CRUD patients, upload mammographies (DICOM/PNG/JPG), prétraitement
 - [x] **Phase 4** — Inférence EfficientNet + Grad-CAM *(modèle placeholder — voir l'avertissement)*
 - [x] **Phase 5** — Génération de rapports PDF
-- [ ] **Phase 6** — Frontend React complet + tableau de bord Recharts
+- [x] **Phase 6a** — Frontend React : authentification et gestion des patients
+- [ ] **Phase 6b** — Frontend : upload, résultats + Grad-CAM, tableau de bord Recharts
 - [ ] **Phase 7** — Assistant IA conversationnel avec disclaimer médical
 - [ ] **Phase 8** — Historique, recherche, tests end-to-end, CI
 
