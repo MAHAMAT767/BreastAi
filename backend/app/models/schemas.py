@@ -14,7 +14,6 @@ from typing import Generic, Literal, TypeVar
 from pydantic import (
     BaseModel,
     ConfigDict,
-    EmailStr,
     Field,
     field_validator,
     model_validator,
@@ -28,6 +27,7 @@ from app.disclaimer import (
     MEDICAL_DISCLAIMER,
     PLACEHOLDER_MODEL_WARNING,
 )
+from app.models.email_address import EmailAddress
 
 ItemT = TypeVar("ItemT")
 
@@ -51,7 +51,7 @@ def _validate_password_strength(value: str) -> str:
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: EmailAddress
     full_name: str = Field(min_length=1, max_length=255)
     role: UserRole = UserRole.DOCTOR
 
@@ -109,7 +109,7 @@ class RefreshRequest(BaseModel):
 
 
 class PasswordResetRequest(BaseModel):
-    email: EmailStr
+    email: EmailAddress
 
 
 class PasswordResetConfirm(BaseModel):
@@ -144,7 +144,7 @@ class PatientBase(BaseModel):
     birth_date: date | None = None
     sex: Literal["F", "M", "O"] = "F"
     phone: str | None = Field(default=None, max_length=30)
-    email: EmailStr | None = None
+    email: EmailAddress | None = None
     address: str | None = Field(default=None, max_length=255)
     medical_history: str | None = None
     notes: str | None = None
@@ -170,7 +170,7 @@ class PatientUpdate(BaseModel):
     birth_date: date | None = None
     sex: Literal["F", "M", "O"] | None = None
     phone: str | None = Field(default=None, max_length=30)
-    email: EmailStr | None = None
+    email: EmailAddress | None = None
     address: str | None = Field(default=None, max_length=255)
     medical_history: str | None = None
     notes: str | None = None

@@ -272,15 +272,47 @@ partager un unique quota à tous les utilisateurs.
 > partagé — Redis ou Memcached — dans `app/auth/rate_limit.py`. En attendant,
 > déployer avec un seul worker, ou considérer que la protection est indicative.
 
-## Schémas d'entrée et de sortie
+## Adresses e-mail
+
+### En entrée : les domaines de réseau privé sont acceptés
+
+Les schémas d'écriture utilisent `EmailAddress`
+(`backend/app/models/email_address.py`) et non `EmailStr`. La différence tient à
+une seule chose : les domaines à usage réservé qui désignent un réseau privé
+sont acceptés.
+
+| Domaine | Accepté | Raison |
+|---------|---------|--------|
+| `medecin@hopital.local` | ✅ | Réseau interne d'un établissement de soins |
+| `medecin@hopital.internal` | ✅ | idem |
+| `medecin@hopital.lan` | ✅ | idem |
+| `medecin@hopital.td` | ✅ | Domaine public ordinaire |
+| `medecin@hopital.test` | ❌ | Réservé aux tests, ne peut désigner aucune adresse réelle |
+| `medecin@hopital.invalid` | ❌ | idem |
+| `medecin@localhost` | ❌ | idem |
+| `pas-un-email`, `sans-domaine@`, `medecin@hopital` | ❌ | Syntaxe invalide |
+
+**Seule** la restriction sur ces trois TLD est levée. Toute la validation de
+syntaxe d'`email-validator` reste en vigueur : arobase manquante, partie locale
+ou domaine vide, domaine sans point, caractères interdits, arobases multiples.
+
+`email-validator` 2.2 n'expose aucun paramètre par appel pour cela — ni
+`allow_special_use_domains`, qui n'existe pas, ni `globally_deliverable=False`,
+qui ne lève pas cette vérification. Le point d'extension prévu par la
+bibliothèque est sa liste de module `SPECIAL_USE_DOMAIN_NAMES`, restreinte une
+fois pour toutes au chargement.
+
+Aucune résolution DNS n'est effectuée : interroger le DNS à chaque création de
+dossier ajouterait de la latence et ferait échouer la saisie hors connexion.
+
+### En sortie : aucune revalidation
 
 Les schémas de lecture (`UserRead`, `PatientRead`) ne dérivent pas des schémas
-d'écriture et déclarent `email: str`, non `EmailStr`.
+d'écriture et déclarent `email: str`.
 
-Revalider une adresse **en sortie** ne protège de rien : la donnée est déjà en
-base. En revanche, le moindre écart devient une erreur 500. C'est exactement ce
-qui se produisait pour un compte sur un domaine interne (`.local`, ce qu'utilise
-typiquement le réseau d'un établissement de soins) : il pouvait se connecter,
+Revalider une adresse **en sortie** ne protège de rien — la donnée est déjà en
+base — mais transforme le moindre écart en erreur 500. C'est exactement ce qui
+se produisait avant ce correctif : un compte en `.local` pouvait se connecter,
 mais `GET /auth/me` échouait en 500 et l'application restait inutilisable.
 
 Règle générale : valider strictement ce qui entre, ne jamais revalider ce qui sort.
@@ -312,7 +344,7 @@ Règle générale : valider strictement ce qui entre, ne jamais revalider ce qui
 | Pas d'envoi d'e-mail | Le jeton de réinitialisation est écrit dans les journaux serveur | 8 |
 | Compteurs de quota en mémoire | Quota multiplié par le nombre d'instances (voir l'encadré ci-dessus) | avant déploiement |
 | `logout` ne révoque pas le jeton | Le client doit l'effacer ; changer le mot de passe coupe toutes les sessions | — |
-| `EmailStr` refuse les TLD réservés **en entrée** | `POST /users` et `POST /patients` rejettent une adresse en `.local` ou `.test`. Les comptes créés par `init_db` sur un tel domaine fonctionnent, eux, entièrement | à arbitrer |
+| Domaines `.test`, `.invalid`, `localhost` refusés | Une adresse de test ne peut pas entrer dans un dossier patient — voir la section « Adresses e-mail » | délibéré |
 | Modèle placeholder | Aucune valeur clinique — voir l'encadré ci-dessus | dès qu'un dataset annoté est disponible |
 | JPEG-LS non pris en charge | Nécessite `pyjpegls`, non installé. JPEG Lossless, JPEG 2000 et RLE fonctionnent | à arbitrer |
 | Stockage sur disque local, non chiffré | Les mammographies ne sont ni sauvegardées ni chiffrées au repos | avant déploiement |

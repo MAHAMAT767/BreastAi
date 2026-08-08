@@ -34,6 +34,63 @@ def test_created_user_can_log_in(client: TestClient, admin_headers: dict[str, st
     auth_headers(client, NEW_USER["email"], NEW_USER["password"])
 
 
+def test_admin_can_create_a_user_on_an_internal_domain(
+    client: TestClient, admin_headers: dict[str, str]
+) -> None:
+    """Symétrique du test de lecture : créer un compte en `.local` doit marcher.
+
+    Un établissement dont le réseau interne adresse ses comptes en
+    `medecin@hopital.local` doit pouvoir créer ses utilisateurs par l'API, et
+    pas seulement par le script d'amorçage.
+    """
+    response = client.post(
+        f"{PREFIX}/users",
+        headers=admin_headers,
+        json={**NEW_USER, "email": "medecin@hopital.local"},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["email"] == "medecin@hopital.local"
+
+
+def test_a_user_created_on_an_internal_domain_can_log_in_and_read_its_profile(
+    client: TestClient, admin_headers: dict[str, str]
+) -> None:
+    """Le parcours complet, de la création à la lecture du profil."""
+    client.post(
+        f"{PREFIX}/users",
+        headers=admin_headers,
+        json={**NEW_USER, "email": "medecin@hopital.local"},
+    )
+
+    headers = auth_headers(client, "medecin@hopital.local", NEW_USER["password"])
+    profile = client.get(f"{PREFIX}/auth/me", headers=headers)
+
+    assert profile.status_code == 200
+    assert profile.json()["email"] == "medecin@hopital.local"
+
+
+def test_password_reset_accepts_an_internal_domain(client: TestClient) -> None:
+    response = client.post(
+        f"{PREFIX}/auth/password-reset/request", json={"email": "medecin@hopital.local"}
+    )
+
+    assert response.status_code == 200
+
+
+def test_reserved_test_domains_remain_refused(
+    client: TestClient, admin_headers: dict[str, str]
+) -> None:
+    """L'assouplissement ne concerne que les domaines de réseau privé."""
+    response = client.post(
+        f"{PREFIX}/users",
+        headers=admin_headers,
+        json={**NEW_USER, "email": "medecin@hopital.test"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_doctor_cannot_create_a_user(
     client: TestClient, doctor_headers: dict[str, str]
 ) -> None:

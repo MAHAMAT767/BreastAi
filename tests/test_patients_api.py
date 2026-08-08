@@ -81,6 +81,31 @@ def test_unknown_sex_is_refused(client: TestClient, doctor_headers: dict[str, st
     assert response.status_code == 422
 
 
+def test_patient_can_be_created_with_an_internal_domain_email(
+    client: TestClient, doctor_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        f"{PREFIX}/patients",
+        headers=doctor_headers,
+        json={**NEW_PATIENT, "email": "contact@hopital.local"},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["email"] == "contact@hopital.local"
+
+
+def test_patient_email_syntax_is_still_checked(
+    client: TestClient, doctor_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        f"{PREFIX}/patients",
+        headers=doctor_headers,
+        json={**NEW_PATIENT, "email": "pas-un-email"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_patient_with_an_internal_domain_email_can_be_read(
     client: TestClient, db: Session, doctor_headers: dict[str, str]
 ) -> None:
