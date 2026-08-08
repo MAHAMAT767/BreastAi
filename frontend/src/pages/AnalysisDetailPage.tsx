@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import AssistantPanel from '@/components/AssistantPanel';
 import PlaceholderModelWarning from '@/components/PlaceholderModelWarning';
 import PredictionBadge from '@/components/PredictionBadge';
 import { Alert, Button, Spinner, TextArea } from '@/components/ui';
@@ -332,8 +333,10 @@ export default function AnalysisDetailPage() {
         )}
       </section>
 
+      <AssistantPanel analysisId={analysis.id} />
       <DoctorReview analysis={analysis} />
       <ReportActions analysis={analysis} />
     </div>
   );
 }
+

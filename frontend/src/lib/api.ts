@@ -5,6 +5,9 @@ import type {
   Analysis,
   AnalysisImageKind,
   AnalysisReview,
+  AssistantAnswer,
+  AssistantMessage,
+  AssistantStatus,
   DashboardStats,
   MessageResponse,
   Page,
@@ -341,6 +344,25 @@ async function fetchBlob(path: string, retried = false): Promise<Blob> {
   }
 
   return response.blob();
+}
+
+// --------------------------------------------------------------------------- //
+// Assistant conversationnel
+// --------------------------------------------------------------------------- //
+
+export function fetchAssistantStatus(): Promise<AssistantStatus> {
+  return request<AssistantStatus>('/assistant/status');
+}
+
+export function askAssistant(
+  analysisId: string,
+  question: string,
+  history: AssistantMessage[],
+): Promise<AssistantAnswer> {
+  return request<AssistantAnswer>(`/assistant/analyses/${analysisId}`, {
+    method: 'POST',
+    body: { question, history },
+  });
 }
 
 // --------------------------------------------------------------------------- //

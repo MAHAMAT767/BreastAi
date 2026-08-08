@@ -199,6 +199,110 @@ Les chemins de stockage sont construits uniquement à partir d'UUID générés p
 serveur. Le nom de fichier fourni par le client est désinfecté et conservé pour
 l'affichage seul — il n'entre jamais dans la construction d'un chemin.
 
+## Assistant conversationnel — `/assistant`
+
+| Méthode | Chemin | Description |
+|---------|--------|-------------|
+| `GET` | `/assistant/status` | Assistant configuré ou non, modèle en service. |
+| `POST` | `/assistant/analyses/{id}` | Poser une question sur une analyse. |
+
+Réservé aux rôles cliniques : l'assistant parle d'un dossier précis, il reste
+donc fermé au rôle `researcher`. Quota de 10 questions par minute et par IP —
+ici autant une protection budgétaire qu'une protection contre les abus.
+
+Le serveur **ne stocke aucune conversation**. L'historique est renvoyé par le
+client à chaque question, tronqué à `ASSISTANT_HISTORY_TURNS` tours : chaque tour
+conservé est refacturé à chaque nouvelle question.
+
+### Modèle retenu : `Qwen/Qwen2.5-7B-Instruct`
+
+Le choix a été fait en appelant réellement l'API, pas sur catalogue. Ce qui a été
+mesuré, avec le jeton du projet :
+
+| Modèle | Résultat |
+|--------|----------|
+| `mistralai/Mistral-7B-Instruct-v0.3` | **Indisponible** — « is not a chat model » sur le routeur |
+| `mistralai/Mistral-7B-Instruct-v0.2`, `Mistral-Small-24B` | Indisponibles sur les fournisseurs actifs |
+| `google/gemma-2-9b-it` | Indisponible |
+| `meta-llama/Llama-3.1-8B-Instruct` | Disponible, mais **refuse de répondre** |
+| `Qwen/Qwen2.5-7B-Instruct` | Disponible, répond, ~1,8 s |
+
+Llama-3.1-8B est disqualifié par son propre alignement : interrogé sur « pourquoi
+cette image est-elle suspecte ? », il répond *« Je ne peux pas fournir
+d'information médicale »*, et sur la signification d'un score : *« Je ne peux pas
+fournir d'informations qui pourraient être utilisées pour diagnostiquer ou
+traiter un cancer »*. Le vocabulaire oncologique déclenche un refus systématique,
+alors même que la question porte sur le fonctionnement d'un classifieur.
+
+Qwen2.5-7B-Instruct répond, en français correct, trois fois plus vite, suit la
+consigne de correction des prémisses fausses, et ses poids sont ouverts
+(Apache-2.0) — ce qui compte pour un outil médical : le modèle reste auditable et
+substituable. Fenêtre de contexte de 32 k jetons, très au-delà des ~1 300 jetons
+qu'atteint une conversation de trois tours ici.
+
+`ASSISTANT_MODEL` permet d'en changer sans toucher au code.
+
+### ⚠️ Limites du tier gratuit — mesurées, pas estimées
+
+L'API historique `api-inference.huggingface.co` **n'existe plus** (le nom de
+domaine ne résout pas). Les appels passent par
+`https://router.huggingface.co/v1`, compatible avec l'API OpenAI, qui redirige
+vers un fournisseur tiers — `together` dans nos essais.
+
+| Point | Constat |
+|-------|---------|
+| **Crédit mensuel** | Très faible. **Épuisé après une quinzaine d'appels** de mise au point, avec un HTTP `402` : *« You have depleted your monthly included credits »*. |
+| **Débit** | Aucun `429` rencontré avant l'épuisement du crédit ; c'est le crédit qui limite, pas la cadence. |
+| **En-têtes de quota** | Aucun. Impossible de connaître le solde autrement qu'en recevant un `402`. |
+| **Coût par question** | ~700 à 1 400 jetons d'entrée selon la longueur de l'historique, ~100 de sortie. Le contexte de l'analyse pèse à lui seul ~600 jetons. |
+| **Latence** | 1,5 à 2 s par réponse. |
+
+**Conséquence pratique : l'assistant s'arrêtera de fonctionner rapidement sur un
+compte gratuit.** Il faut soit créditer le compte Hugging Face, soit souscrire à
+PRO (20 × le quota inclus), soit pointer `ASSISTANT_BASE_URL` vers un autre
+fournisseur compatible OpenAI.
+
+L'application traite ce cas explicitement : un `402` ou un `429` du fournisseur
+devient un `503` avec le message *« Le quota du service d'assistance est épuisé.
+L'analyse et le rapport restent disponibles sans l'assistant. »* Le reste de la
+plateforme continue de fonctionner.
+
+### Ce qui est transmis au fournisseur
+
+**Transmis** : âge, sexe, format du cliché, version de prétraitement,
+classification, probabilité, score de confiance, temps d'inférence, version du
+modèle, rectangle Grad-CAM.
+
+**Jamais transmis** : nom, prénom, code dossier, date de naissance, téléphone,
+adresse postale, adresse e-mail, antécédents, **et le commentaire du médecin**.
+
+Ce dernier point est un arbitrage. Le commentaire du médecin est cliniquement la
+donnée la plus riche, mais c'est du texte libre : rien n'empêche un praticien d'y
+écrire un nom. Le faire sortir vers un service tiers pour améliorer une réponse
+ne vaut pas ce risque.
+
+Le contexte exact est renvoyé dans `context_sent` et affiché dans l'interface,
+sous « Contexte transmis au service » : l'utilisateur peut vérifier ce qui est
+sorti de l'établissement.
+
+### Les avertissements ne dépendent pas du modèle
+
+Chaque réponse est encadrée **par le code** : l'avertissement de modèle de
+démonstration devant, l'avertissement médical derrière. Ils sont dans le champ
+`answer` — donc ils suivent le texte s'il est copié ailleurs — et disponibles
+séparément (`answer_body`, `model_warning`, `disclaimer`) pour que l'interface
+les mette en forme.
+
+Ce n'est pas de la prudence excessive. À la mise au point, avec une consigne
+système explicite, le modèle a **omis l'avertissement de démonstration une fois
+sur deux**, et a accepté la prémisse fausse « pourquoi cette image est-elle
+suspecte ? » alors que la classification produite était bénigne. Un garde-fou
+qu'on demande poliment n'est pas un garde-fou.
+
+La consigne système reste utile — après renforcement, le modèle corrige
+désormais la prémisse de lui-même : *« Cette image n'est pas suspecte car la
+classification produite est bénigne »* — mais elle ne remplace pas la garantie.
+
 ## Tableau de bord — `/stats`
 
 `GET /stats/dashboard` renvoie les agrégats affichés par le frontend : compteurs
