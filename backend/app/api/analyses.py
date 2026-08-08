@@ -19,15 +19,24 @@ from fastapi import (
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from app.ai.inference import is_placeholder_version
 from app.auth.dependencies import ClinicalUser
 from app.database.session import get_db
+from app.disclaimer import PLACEHOLDER_MODEL_WARNING
 from app.models.analysis import Analysis
 from app.models.audit_log import AuditAction
-from app.models.schemas import AnalysisRead, AnalysisReview, Page
+from app.models.schemas import (
+    AnalysisRead,
+    AnalysisReview,
+    Page,
+    ReportInfo,
+    ReportVerification,
+)
 from app.services import (
     analysis_service,
     audit_service,
     patient_service,
+    report_service,
     storage_service,
 )
 
@@ -201,6 +210,121 @@ def rerun_inference(
         detail="Inférence rejouée",
     )
     return AnalysisRead.from_analysis(analysis)
+
+
+@router.get(
+    "/{analysis_id}/report",
+    summary="Télécharger le rapport PDF",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def download_report(
+    analysis_id: uuid.UUID, request: Request, db: DbSession, user: ClinicalUser
+) -> Response:
+    """Sert le compte rendu PDF, en le produisant s'il n'existe pas encore."""
+    analysis = _get_or_404(db, analysis_id)
+
+    try:
+        pdf = report_service.get_or_generate(db, analysis, generated_by=user)
+    except report_service.ReportGenerationError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    audit_service.record(
+        db,
+        AuditAction.REPORT_EXPORT,
+        user_id=user.id,
+        resource_type="analysis",
+        resource_id=str(analysis.id),
+        request=request,
+    )
+
+    filename = f"breastai-rapport-{str(analysis.id)[:8]}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@router.post(
+    "/{analysis_id}/report", response_model=ReportInfo, summary="Régénérer le rapport"
+)
+def regenerate_report(
+    analysis_id: uuid.UUID, request: Request, db: DbSession, user: ClinicalUser
+) -> ReportInfo:
+    """Reconstruit le rapport, par exemple après une nouvelle lecture médicale.
+
+    L'empreinte est recalculée sur le contenu courant. Si la lecture médicale ou
+    le résultat ont changé, l'ancien rapport cesse de se vérifier — un document
+    rendu obsolète ne doit pas continuer à passer pour le compte rendu courant.
+    """
+    analysis = _get_or_404(db, analysis_id)
+
+    try:
+        result = report_service.generate_report(db, analysis, generated_by=user)
+    except report_service.ReportGenerationError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    audit_service.record(
+        db,
+        AuditAction.REPORT_EXPORT,
+        user_id=user.id,
+        resource_type="analysis",
+        resource_id=str(analysis.id),
+        request=request,
+        detail="Rapport régénéré",
+    )
+
+    is_placeholder = is_placeholder_version(analysis.model_version)
+    return ReportInfo(
+        analysis_id=analysis.id,
+        signature=result.signature,
+        generated_at=result.generated_at,
+        size_bytes=len(result.pdf),
+        is_placeholder_model=is_placeholder,
+        model_warning=PLACEHOLDER_MODEL_WARNING if is_placeholder else None,
+    )
+
+
+@router.get(
+    "/{analysis_id}/report/verify",
+    response_model=ReportVerification,
+    summary="Vérifier l'empreinte du rapport",
+)
+def verify_report(
+    analysis_id: uuid.UUID, db: DbSession, user: ClinicalUser
+) -> ReportVerification:
+    """Recalcule l'empreinte et la compare à celle enregistrée.
+
+    Permet de contrôler qu'un rapport présenté correspond bien à l'analyse telle
+    qu'elle figure en base.
+    """
+    del user
+    analysis = _get_or_404(db, analysis_id)
+
+    if not analysis.report_path:
+        return ReportVerification(
+            analysis_id=analysis.id,
+            has_report=False,
+            signature_valid=False,
+            detail="Aucun rapport n'a encore été produit pour cette analyse.",
+        )
+
+    valid = report_service.verify_signature(analysis, analysis.patient)
+    return ReportVerification(
+        analysis_id=analysis.id,
+        has_report=True,
+        signature_valid=valid,
+        generated_at=analysis.report_generated_at,
+        detail=(
+            "L'empreinte correspond à l'analyse enregistrée."
+            if valid
+            else "L'empreinte ne correspond plus : le rapport doit être régénéré."
+        ),
+    )
 
 
 @router.patch(

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -84,6 +86,11 @@ class Analysis(Base, TimestampMixin):
     processed_image_path: Mapped[str | None] = mapped_column(String(500))
     gradcam_path: Mapped[str | None] = mapped_column(String(500))
     report_path: Mapped[str | None] = mapped_column(String(500))
+    #: Empreinte HMAC-SHA256 des faits du rapport, imprimée sur le document.
+    #: Permet de détecter qu'un rapport présenté ne correspond plus à l'analyse
+    #: enregistrée. Ce n'est pas une signature électronique qualifiée.
+    report_signature: Mapped[str | None] = mapped_column(String(64))
+    report_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     image_format: Mapped[str | None] = mapped_column(String(10))
     file_size_bytes: Mapped[int | None] = mapped_column(Integer)
 

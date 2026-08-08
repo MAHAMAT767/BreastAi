@@ -218,6 +218,9 @@ class AnalysisRead(BaseModel):
     has_gradcam: bool = False
     gradcam_disclaimer: str | None = None
     suspicious_region: SuspiciousRegionRead | None = None
+    has_report: bool = False
+    report_generated_at: datetime | None = None
+    report_signature: str | None = None
 
     #: Rappelé sur chaque analyse : le résultat ne vaut pas diagnostic.
     disclaimer: str = MEDICAL_DISCLAIMER
@@ -242,6 +245,7 @@ class AnalysisRead(BaseModel):
         """Construit la réponse en assemblant les champs dérivés de l'entité."""
         read = cls.model_validate(analysis)
         read.has_gradcam = bool(getattr(analysis, "gradcam_path", None))
+        read.has_report = bool(getattr(analysis, "report_path", None))
 
         if getattr(analysis, "region_width", None):
             read.suspicious_region = SuspiciousRegionRead(
@@ -259,6 +263,32 @@ class AnalysisReview(BaseModel):
 
     doctor_comment: str | None = None
     doctor_validated: bool | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Rapports
+# --------------------------------------------------------------------------- #
+
+
+class ReportInfo(BaseModel):
+    """Métadonnées d'un rapport produit."""
+
+    analysis_id: uuid.UUID
+    signature: str = Field(description="Empreinte HMAC-SHA256 imprimée sur le document.")
+    generated_at: datetime
+    size_bytes: int
+    is_placeholder_model: bool
+    model_warning: str | None = None
+
+
+class ReportVerification(BaseModel):
+    """Résultat du contrôle d'intégrité d'un rapport."""
+
+    analysis_id: uuid.UUID
+    has_report: bool
+    signature_valid: bool
+    generated_at: datetime | None = None
+    detail: str
 
 
 # --------------------------------------------------------------------------- #
