@@ -68,10 +68,23 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class UserRead(UserBase):
+class UserRead(BaseModel):
+    """Profil renvoyé par l'API.
+
+    Ne dérive **pas** de `UserBase` et déclare `email: str` et non `EmailStr` :
+    revalider une adresse en sortie ne protège de rien — la donnée est déjà en
+    base — mais transforme le moindre écart en erreur 500. Concrètement, un
+    compte créé sur un domaine interne (`.local`, ce qu'utilise typiquement le
+    réseau d'un établissement de soins) faisait planter `GET /auth/me` : le
+    compte pouvait se connecter mais son profil était illisible.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    email: str
+    full_name: str
+    role: UserRole
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None = None
@@ -163,11 +176,28 @@ class PatientUpdate(BaseModel):
     notes: str | None = None
 
 
-class PatientRead(PatientBase):
+class PatientRead(BaseModel):
+    """Dossier renvoyé par l'API.
+
+    Comme `UserRead`, ne dérive pas du schéma d'entrée : `email` est un `str`
+    en sortie, pour qu'une adresse déjà enregistrée ne puisse pas rendre un
+    dossier patient impossible à afficher.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    code: str
+    first_name: str
+    last_name: str
     full_name: str
+    birth_date: date | None = None
+    sex: Literal["F", "M", "O"]
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    medical_history: str | None = None
+    notes: str | None = None
     is_deleted: bool
     created_at: datetime
     updated_at: datetime

@@ -272,6 +272,19 @@ partager un unique quota à tous les utilisateurs.
 > partagé — Redis ou Memcached — dans `app/auth/rate_limit.py`. En attendant,
 > déployer avec un seul worker, ou considérer que la protection est indicative.
 
+## Schémas d'entrée et de sortie
+
+Les schémas de lecture (`UserRead`, `PatientRead`) ne dérivent pas des schémas
+d'écriture et déclarent `email: str`, non `EmailStr`.
+
+Revalider une adresse **en sortie** ne protège de rien : la donnée est déjà en
+base. En revanche, le moindre écart devient une erreur 500. C'est exactement ce
+qui se produisait pour un compte sur un domaine interne (`.local`, ce qu'utilise
+typiquement le réseau d'un établissement de soins) : il pouvait se connecter,
+mais `GET /auth/me` échouait en 500 et l'application restait inutilisable.
+
+Règle générale : valider strictement ce qui entre, ne jamais revalider ce qui sort.
+
 ## Rôles
 
 | Rôle | Portée |
@@ -299,7 +312,7 @@ partager un unique quota à tous les utilisateurs.
 | Pas d'envoi d'e-mail | Le jeton de réinitialisation est écrit dans les journaux serveur | 8 |
 | Compteurs de quota en mémoire | Quota multiplié par le nombre d'instances (voir l'encadré ci-dessus) | avant déploiement |
 | `logout` ne révoque pas le jeton | Le client doit l'effacer ; changer le mot de passe coupe toutes les sessions | — |
-| `EmailStr` refuse les TLD réservés | Une adresse en `.local` interne serait rejetée | à arbitrer |
+| `EmailStr` refuse les TLD réservés **en entrée** | `POST /users` et `POST /patients` rejettent une adresse en `.local` ou `.test`. Les comptes créés par `init_db` sur un tel domaine fonctionnent, eux, entièrement | à arbitrer |
 | Modèle placeholder | Aucune valeur clinique — voir l'encadré ci-dessus | dès qu'un dataset annoté est disponible |
 | JPEG-LS non pris en charge | Nécessite `pyjpegls`, non installé. JPEG Lossless, JPEG 2000 et RLE fonctionnent | à arbitrer |
 | Stockage sur disque local, non chiffré | Les mammographies ne sont ni sauvegardées ni chiffrées au repos | avant déploiement |
