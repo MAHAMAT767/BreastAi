@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Generic, Literal, TypeVar
+from typing import Final, Generic, Literal, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -319,6 +319,60 @@ class ReportVerification(BaseModel):
     signature_valid: bool
     generated_at: datetime | None = None
     detail: str
+
+
+# --------------------------------------------------------------------------- #
+# Tableau de bord
+# --------------------------------------------------------------------------- #
+
+#: Pourquoi aucune « précision du modèle » n'est publiée.
+ACCURACY_UNAVAILABLE_NOTE: Final[str] = (
+    "Aucun taux d'exactitude n'est calculable : il faudrait un diagnostic de "
+    "référence par cas (biopsie, suivi), qui n'est pas enregistré. Le taux "
+    "affiché est celui des analyses relues et validées par un médecin — il "
+    "mesure l'activité de relecture, pas la justesse du modèle."
+)
+
+
+class MonthlyCount(BaseModel):
+    # `from_attributes` ne se propage pas aux modèles imbriqués : sans cette
+    # ligne, la liste de dataclasses du service est refusée à la validation.
+    model_config = ConfigDict(from_attributes=True)
+
+    month: str = Field(description="Mois au format AAAA-MM.")
+    total: int
+    benign: int
+    malignant: int
+
+
+class DashboardStats(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    total_patients: int
+    total_analyses: int
+    completed_analyses: int
+    pending_analyses: int
+    failed_analyses: int
+    benign_count: int
+    malignant_count: int
+    average_inference_time_ms: float | None = None
+    doctor_validated_count: int
+    doctor_validation_rate: float | None = None
+    monthly: list[MonthlyCount]
+    model_versions: list[str]
+
+    is_placeholder_model: bool
+    model_warning: str | None = None
+
+    #: Toujours faux en l'état — voir `accuracy_note`.
+    accuracy_available: bool = False
+    accuracy_note: str = ACCURACY_UNAVAILABLE_NOTE
+
+    @model_validator(mode="after")
+    def _attach_model_warning(self) -> DashboardStats:
+        if self.is_placeholder_model and self.model_warning is None:
+            self.model_warning = PLACEHOLDER_MODEL_WARNING
+        return self
 
 
 # --------------------------------------------------------------------------- #

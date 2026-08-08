@@ -9,7 +9,7 @@ import { vi } from 'vitest';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { storeTokens } from '@/lib/tokens';
-import type { Patient, User, UserRole } from '@/types';
+import type { Analysis, DashboardStats, Patient, User, UserRole } from '@/types';
 
 export const API_BASE = 'http://localhost:8000/api/v1';
 
@@ -43,6 +43,66 @@ export function makePatient(overrides: Partial<Patient> = {}): Patient {
     is_deleted: false,
     created_at: '2026-02-01T10:00:00Z',
     updated_at: '2026-02-01T10:00:00Z',
+    ...overrides,
+  };
+}
+
+export function makeAnalysis(overrides: Partial<Analysis> = {}): Analysis {
+  return {
+    id: 'analysis-1',
+    patient_id: 'patient-1',
+    original_filename: 'mammo.png',
+    image_format: 'png',
+    file_size_bytes: 204_800,
+    status: 'completed',
+    prediction: 'benign',
+    probability: 0.31,
+    confidence: 0.69,
+    inference_time_ms: 620,
+    model_version: 'placeholder-efficientnet_b0-imagenet',
+    preprocessing_version: 'v1',
+    error_message: null,
+    doctor_comment: null,
+    doctor_validated: false,
+    created_at: '2026-08-01T09:30:00Z',
+    is_placeholder_model: true,
+    model_warning: '⚠️ MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE.',
+    has_gradcam: true,
+    gradcam_disclaimer:
+      "La carte de chaleur indique les régions ayant influencé la décision du modèle, et non l'emplacement d'une lésion.",
+    suspicious_region: null,
+    has_report: false,
+    report_generated_at: null,
+    report_signature: null,
+    disclaimer:
+      "BreastAI est un outil d'aide à la décision. Ses résultats ne constituent pas un diagnostic et ne remplacent pas l'avis d'un professionnel de santé qualifié.",
+    ...overrides,
+  };
+}
+
+export function makeStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
+  return {
+    total_patients: 12,
+    total_analyses: 30,
+    completed_analyses: 28,
+    pending_analyses: 1,
+    failed_analyses: 1,
+    benign_count: 20,
+    malignant_count: 8,
+    average_inference_time_ms: 640,
+    doctor_validated_count: 14,
+    doctor_validation_rate: 0.5,
+    monthly: [
+      { month: '2026-06', total: 8, benign: 6, malignant: 2 },
+      { month: '2026-07', total: 12, benign: 9, malignant: 3 },
+      { month: '2026-08', total: 8, benign: 5, malignant: 3 },
+    ],
+    model_versions: ['placeholder-efficientnet_b0-imagenet'],
+    is_placeholder_model: true,
+    model_warning: '⚠️ MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE.',
+    accuracy_available: false,
+    accuracy_note:
+      "Aucun taux d'exactitude n'est calculable : il faudrait un diagnostic de référence par cas. Le taux affiché mesure l'activité de relecture, pas la justesse du modèle.",
     ...overrides,
   };
 }

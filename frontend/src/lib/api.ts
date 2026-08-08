@@ -2,10 +2,15 @@
 
 import { clearTokens, getAccessToken, getRefreshToken, storeTokens } from '@/lib/tokens';
 import type {
+  Analysis,
+  AnalysisImageKind,
+  AnalysisReview,
+  DashboardStats,
   MessageResponse,
   Page,
   Patient,
   PatientPayload,
+  ReportVerification,
   TokenPair,
   User,
 } from '@/types';
@@ -252,6 +257,98 @@ export function updatePatient(id: string, payload: Partial<PatientPayload>): Pro
 
 export function deletePatient(id: string): Promise<MessageResponse> {
   return request<MessageResponse>(`/patients/${id}`, { method: 'DELETE' });
+}
+
+// --------------------------------------------------------------------------- //
+// Analyses
+// --------------------------------------------------------------------------- //
+
+export interface AnalysisQuery {
+  patientId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function fetchAnalyses(query: AnalysisQuery = {}): Promise<Page<Analysis>> {
+  const params = new URLSearchParams();
+  if (query.patientId) params.set('patient_id', query.patientId);
+  params.set('limit', String(query.limit ?? 20));
+  params.set('offset', String(query.offset ?? 0));
+
+  return request<Page<Analysis>>(`/analyses?${params.toString()}`);
+}
+
+export function fetchAnalysis(id: string): Promise<Analysis> {
+  return request<Analysis>(`/analyses/${id}`);
+}
+
+export function uploadAnalysis(patientId: string, file: File): Promise<Analysis> {
+  const form = new FormData();
+  form.append('patient_id', patientId);
+  form.append('file', file);
+
+  // Pas d'en-tête Content-Type : le navigateur doit poser lui-même le
+  // `boundary` du multipart, qu'on ne peut pas deviner.
+  return request<Analysis>('/analyses', { method: 'POST', body: form });
+}
+
+export function reviewAnalysis(id: string, review: AnalysisReview): Promise<Analysis> {
+  return request<Analysis>(`/analyses/${id}/review`, { method: 'PATCH', body: review });
+}
+
+export function rerunInference(id: string): Promise<Analysis> {
+  return request<Analysis>(`/analyses/${id}/infer`, { method: 'POST' });
+}
+
+/**
+ * Récupère une image d'analyse sous forme de blob.
+ *
+ * Les images ne peuvent pas être posées directement dans un `src` : l'API exige
+ * un en-tête d'autorisation, qu'une balise `<img>` n'envoie pas. Le blob est
+ * converti en URL d'objet par `useAuthenticatedImage`.
+ */
+export async function fetchAnalysisImage(
+  id: string,
+  kind: AnalysisImageKind = 'processed',
+): Promise<Blob> {
+  return fetchBlob(`/analyses/${id}/image?kind=${kind}`);
+}
+
+export function fetchReport(id: string): Promise<Blob> {
+  return fetchBlob(`/analyses/${id}/report`);
+}
+
+export function verifyReport(id: string): Promise<ReportVerification> {
+  return request<ReportVerification>(`/analyses/${id}/report/verify`);
+}
+
+/** Variante de `request` pour les réponses binaires (images, PDF). */
+async function fetchBlob(path: string, retried = false): Promise<Blob> {
+  const headers = new Headers();
+  const token = getAccessToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const response = await fetch(`${API_URL}${PREFIX}${path}`, { headers });
+
+  if (response.status === 401 && !retried) {
+    if (await ensureSingleRefresh()) return fetchBlob(path, true);
+    clearTokens();
+  }
+
+  if (!response.ok) {
+    const errorBody = await parseBody(response);
+    throw new ApiError(extractMessage(response.status, errorBody), response.status, errorBody);
+  }
+
+  return response.blob();
+}
+
+// --------------------------------------------------------------------------- //
+// Tableau de bord
+// --------------------------------------------------------------------------- //
+
+export function fetchDashboardStats(): Promise<DashboardStats> {
+  return request<DashboardStats>('/stats/dashboard');
 }
 
 // --------------------------------------------------------------------------- //

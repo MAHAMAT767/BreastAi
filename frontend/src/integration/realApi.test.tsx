@@ -237,6 +237,12 @@ describe.skipIf(!reachable)("Intégration avec l'API réelle", () => {
   });
 });
 
+// Le dépôt réel d'une mammographie est couvert par `upload.integration.test.ts`,
+// qui tourne en environnement node : le `FormData` de jsdom n'est pas celui
+// qu'attend le `fetch` d'undici, et un envoi multipart construit avec les
+// objets jsdom ne quitte jamais le processus de test. Le détail est expliqué
+// en tête de ce fichier.
+
 describe.skipIf(reachable)('Intégration avec l’API réelle', () => {
   it('est ignorée : API injoignable', () => {
     // Trace explicite dans le rapport de tests, pour qu'une exécution sans

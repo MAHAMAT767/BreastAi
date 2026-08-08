@@ -14,22 +14,25 @@ const PIPELINE = [
   { label: 'Grad-CAM', ready: true },
   { label: 'Rapport PDF', ready: true },
   { label: 'Assistant IA', ready: false },
-];
+] as const;
 
 function ApiStatus() {
   const { data, isPending, isError } = useQuery({ queryKey: ['health'], queryFn: getHealth });
 
+  // Couleurs d'état, et non couleurs de séries : `--color-benign` et
+  // `--color-malignant` désignent des classes de résultat, pas la santé d'un
+  // service. Les réutiliser ici brouillerait leur signification.
   if (isPending) return <span className="text-slate-500">Connexion à l'API…</span>;
   if (isError) {
     return (
-      <span className="text-malignant">
+      <span className="text-red-700">
         API injoignable — vérifiez que le backend est démarré.
       </span>
     );
   }
 
   return (
-    <span className="text-benign">
+    <span className="text-emerald-700">
       API connectée — {data.app_name} v{data.version} ({data.environment})
     </span>
   );
@@ -49,16 +52,21 @@ export default function HomePage() {
         </p>
       </header>
 
-      {hasRole(...CLINICAL_ROLES) && (
-        <div className="flex flex-wrap gap-3">
-          <Link to="/patients" className={buttonClasses('primary')}>
-            Consulter les patients
-          </Link>
-          <Link to="/patients/nouveau" className={buttonClasses('secondary')}>
-            Créer un dossier
-          </Link>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-3">
+        {hasRole(...CLINICAL_ROLES) && (
+          <>
+            <Link to="/patients" className={buttonClasses('primary')}>
+              Consulter les patients
+            </Link>
+            <Link to="/patients/nouveau" className={buttonClasses('secondary')}>
+              Créer un dossier
+            </Link>
+          </>
+        )}
+        <Link to="/tableau-de-bord" className={buttonClasses('secondary')}>
+          Tableau de bord
+        </Link>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <section className="rounded-lg border border-slate-200 bg-white p-5">
