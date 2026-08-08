@@ -31,6 +31,23 @@ def test_cors_origins_accept_comma_separated_string() -> None:
     assert settings.cors_origins == ["http://a.test", "http://b.test"]
 
 
+def test_cors_origins_read_from_the_environment(monkeypatch) -> None:
+    """Le format documenté dans .env.example doit fonctionner tel quel.
+
+    pydantic-settings décode par défaut les champs de type complexe en JSON :
+    sans `NoDecode`, cette valeur faisait échouer le démarrage de l'application
+    avec une `SettingsError`, alors qu'elle est celle que le README recommande.
+    """
+    monkeypatch.setenv("CORS_ORIGINS", "http://a.test,http://b.test")
+
+    assert Settings().cors_origins == ["http://a.test", "http://b.test"]
+
+
+def test_assistant_is_disabled_without_a_token() -> None:
+    assert Settings(huggingface_api_token=None).assistant_enabled is False
+    assert Settings(huggingface_api_token="hf_x").assistant_enabled is True
+
+
 def test_is_production_flag() -> None:
     assert Settings(environment="production").is_production is True
     assert Settings(environment="development").is_production is False

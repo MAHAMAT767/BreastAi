@@ -30,6 +30,9 @@ class AuditAction(StrEnum):
     ANALYSIS_CREATE = "analysis_create"
     ANALYSIS_VIEW = "analysis_view"
     REPORT_EXPORT = "report_export"
+    #: Une question à l'assistant fait sortir du contexte clinique vers un
+    #: fournisseur tiers : la trace importe, le texte de la question non.
+    ASSISTANT_QUERY = "assistant_query"
 
 
 class AuditLog(Base):

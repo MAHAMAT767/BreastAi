@@ -33,6 +33,8 @@ Statut : ⛔ bloquant · ⚠️ à traiter · 📋 à documenter
 | ⛔ | Sauvegardes chiffrées et restauration testée | Aucune sauvegarde configurée. Une sauvegarde jamais restaurée n'est pas une sauvegarde. |
 | ⚠️ | Purge et durée de conservation | Aucune politique définie. La suppression des dossiers est logique : rien n'est jamais réellement effacé. |
 | ⚠️ | Anonymisation pour le rôle chercheur | Le rôle existe et est refusé sur les dossiers nominatifs, mais aucune vue anonymisée n'est encore proposée. |
+| ⛔ | **Transfert de données vers un sous-traitant étranger** | L'assistant conversationnel envoie le contexte clinique d'une analyse à Hugging Face, qui route vers un fournisseur tiers (`together` observé), hors du Tchad. Aucun identifiant direct n'est transmis — ni nom, ni code dossier, ni date de naissance, ni commentaire du médecin — mais l'âge, le sexe et le résultat d'un examen restent des données de santé. Exige : un contrat de sous-traitance, une information des patientes, et la vérification que ce transfert est licite. À défaut, désactiver l'assistant en retirant `HUGGINGFACE_API_TOKEN`. |
+| ⚠️ | Rétention chez le fournisseur | Les conditions de conservation et de réutilisation des requêtes par le fournisseur n'ont pas été auditées. Le serveur BreastAI, lui, ne stocke aucune conversation. |
 | 📋 | Registre de traitement, information des patientes, consentement | À établir selon le cadre juridique applicable. |
 
 ## Sécurité applicative
@@ -60,6 +62,7 @@ Statut : ⛔ bloquant · ⚠️ à traiter · 📋 à documenter
 | ⚠️ | Uvicorn sans `--reload` en production | Le Dockerfile est réglé pour le développement. |
 | ⚠️ | Inférence synchrone dans la requête HTTP | Mesurée entre 500 et 1500 ms par analyse sur CPU. À passer en tâche de fond si le volume augmente. |
 | ⚠️ | Surveillance et alertes | Aucune. Au minimum : taux d'erreur, latence d'inférence, espace disque. |
+| ⚠️ | **Crédit de l'assistant** | Le quota gratuit Hugging Face s'épuise en quelques dizaines de questions (mesuré : ~15). Sans crédit, l'assistant renvoie un `503` — le reste de la plateforme continue de fonctionner. Prévoir un budget ou l'accepter comme fonctionnalité intermittente. |
 | 📋 | Procédure de retrait d'un modèle défaillant | `POST /analyses/{id}/infer` permet de réévaluer une analyse après remplacement du modèle. La procédure elle-même reste à écrire. |
 
 ## Interface et usage
@@ -69,5 +72,6 @@ Statut : ⛔ bloquant · ⚠️ à traiter · 📋 à documenter
 | ⛔ | Avertissement médical visible sur chaque écran de résultat | Présent côté API (`disclaimer`, `model_warning`, `gradcam_disclaimer`). À rendre impossible à manquer côté frontend en Phase 6. |
 | ⛔ | Aucun résultat placeholder montré à une patiente | Tant que `is_placeholder_model` vaut `true`, aucune sortie ne doit quitter le cadre technique. Les rapports PDF portent bandeau et filigrane sur chaque page dans ce cas. |
 | ⚠️ | Devenir des rapports imprimés | Un PDF sorti de l'application n'est plus contrôlé : ni révocable, ni traçable. Définir qui peut exporter, et ce qu'il advient des copies. |
-| ⚠️ | Formation des utilisateurs | Ce qu'est une carte Grad-CAM, ce qu'elle n'est pas, et comment lire une probabilité. |
+| ⚠️ | Formation des utilisateurs | Ce qu'est une carte Grad-CAM, ce qu'elle n'est pas, comment lire une probabilité, et ce qu'un assistant conversationnel peut affirmer sans le savoir. |
+| ⚠️ | Statut de l'assistant | Il explique des sorties de modèle, il ne raisonne pas sur un cliché. Les avertissements sont ajoutés par le code parce que le modèle les oublie — voir docs/API.md. |
 | 📋 | Traçabilité de la lecture médicale | `doctor_validated` et `doctor_comment` existent ; leur usage doit être inscrit dans le protocole de service. |

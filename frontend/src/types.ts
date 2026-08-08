@@ -154,6 +154,37 @@ export const ACCEPTED_EXTENSIONS = ['.dcm', '.dicom', '.png', '.jpg', '.jpeg'] a
 export const MAX_UPLOAD_SIZE_MB = 50;
 
 // --------------------------------------------------------------------------- //
+// Assistant conversationnel
+// --------------------------------------------------------------------------- //
+
+export interface AssistantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AssistantAnswer {
+  /** Texte complet, avertissements compris : à citer ou à copier. */
+  answer: string;
+  /** Réponse brute du modèle, sans les avertissements. */
+  answer_body: string;
+  model: string;
+  disclaimer: string;
+  is_placeholder_model: boolean;
+  model_warning: string | null;
+  /** Contexte exact transmis au fournisseur, pour vérification. */
+  context_sent: string;
+  usage: Record<string, number>;
+}
+
+export interface AssistantStatus {
+  enabled: boolean;
+  model: string | null;
+  provider: string;
+  disclaimer: string;
+  notice: string;
+}
+
+// --------------------------------------------------------------------------- //
 // Tableau de bord
 // --------------------------------------------------------------------------- //
 

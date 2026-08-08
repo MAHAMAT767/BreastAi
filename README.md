@@ -53,7 +53,8 @@ Upload → Prétraitement → EfficientNet → Classification → Grad-CAM → L
 |--------------|--------------|
 | Frontend     | React, TypeScript, Tailwind CSS, React Query, React Router, Recharts |
 | Backend      | FastAPI, SQLAlchemy, Alembic, JWT, Pydantic |
-| IA           | PyTorch, TorchVision, OpenCV, Albumentations, Grad-CAM, ONNX Runtime |
+| IA           | PyTorch, TorchVision, OpenCV, pydicom, Grad-CAM |
+| Assistant    | Hugging Face Inference Providers (`Qwen/Qwen2.5-7B-Instruct`) |
 | Base de données | PostgreSQL |
 | Déploiement  | Docker, GitHub Actions, Railway (API), Vercel (frontend) |
 
@@ -179,7 +180,7 @@ une absence de backend en échec de tests.
 - [x] **Phase 5** — Génération de rapports PDF
 - [x] **Phase 6a** — Frontend React : authentification et gestion des patients
 - [x] **Phase 6b** — Frontend : upload, résultats + Grad-CAM, tableau de bord Recharts
-- [ ] **Phase 7** — Assistant IA conversationnel avec disclaimer médical
+- [x] **Phase 7** — Assistant IA conversationnel avec disclaimer médical
 - [ ] **Phase 8** — Historique, recherche, tests end-to-end, CI
 
 ## Confidentialité des données

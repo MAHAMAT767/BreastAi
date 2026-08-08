@@ -322,6 +322,51 @@ class ReportVerification(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Assistant conversationnel
+# --------------------------------------------------------------------------- #
+
+
+class AssistantMessageIn(BaseModel):
+    """Tour de conversation renvoyé par le client pour donner le fil."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class AssistantAsk(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    #: Historique conservé côté client : le serveur ne stocke aucune conversation.
+    history: list[AssistantMessageIn] = Field(default_factory=list, max_length=40)
+
+
+class AssistantAnswerRead(BaseModel):
+    #: Texte complet, avertissements compris : c'est celui à citer ou à copier.
+    answer: str
+    #: Réponse brute du modèle, sans les avertissements, pour que l'interface
+    #: les affiche avec leur mise en forme propre.
+    answer_body: str
+    model: str
+    #: Rappelé sur chaque réponse, et déjà inclus dans le texte de `answer`.
+    disclaimer: str = MEDICAL_DISCLAIMER
+    is_placeholder_model: bool = False
+    model_warning: str | None = None
+    #: Contexte exact transmis au fournisseur, renvoyé pour que l'utilisateur
+    #: puisse vérifier ce qui est sorti de l'établissement.
+    context_sent: str = ""
+    usage: dict[str, int] = Field(default_factory=dict)
+
+
+class AssistantStatus(BaseModel):
+    """État de l'assistant, pour que l'interface sache quoi afficher."""
+
+    enabled: bool
+    model: str | None = None
+    provider: str = "Hugging Face Inference Providers"
+    disclaimer: str = MEDICAL_DISCLAIMER
+    notice: str
+
+
+# --------------------------------------------------------------------------- #
 # Tableau de bord
 # --------------------------------------------------------------------------- #
 

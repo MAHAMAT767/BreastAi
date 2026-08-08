@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -50,6 +51,24 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     login_rate_limit: str = "10/minute"
     password_reset_rate_limit: str = "5/minute"
+    #: Chaque question à l'assistant consomme du crédit chez le fournisseur :
+    #: le quota est ici une protection budgétaire autant qu'une protection
+    #: contre les abus.
+    assistant_rate_limit: str = "10/minute"
+
+    # ---------- Assistant conversationnel (Phase 7) ----------
+    #: Sans jeton, l'assistant est désactivé et l'API le dit explicitement
+    #: plutôt que d'échouer à l'appel.
+    huggingface_api_token: str | None = None
+    assistant_base_url: str = "https://router.huggingface.co/v1"
+    assistant_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    assistant_max_tokens: int = 400
+    assistant_temperature: float = 0.2
+    assistant_timeout_seconds: float = 45.0
+    #: Nombre de tours conservés dans l'historique envoyé au modèle. Chaque tour
+    #: est refacturé à chaque question : au-delà, le coût grimpe sans que la
+    #: réponse s'améliore.
+    assistant_history_turns: int = 6
 
     # ---------- Compte administrateur initial ----------
     # Utilisé une seule fois par `python -m app.database.init_db`.
@@ -58,7 +77,13 @@ class Settings(BaseSettings):
     first_admin_name: str = "Administrateur BreastAI"
 
     # ---------- CORS ----------
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    #: `NoDecode` désactive le décodage JSON que pydantic-settings applique par
+    #: défaut aux champs de type complexe lus depuis l'environnement. Sans lui,
+    #: la valeur `CORS_ORIGINS=a,b` — celle que documente .env.example — fait
+    #: échouer le démarrage avant même que le validateur ci-dessous ne s'exécute.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
 
     # ---------- Stockage (Phase 3) ----------
     upload_dir: str = "./uploads"
@@ -79,6 +104,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod"}
+
+    @property
+    def assistant_enabled(self) -> bool:
+        return bool(self.huggingface_api_token)
 
     @property
     def sqlalchemy_url(self) -> str:
