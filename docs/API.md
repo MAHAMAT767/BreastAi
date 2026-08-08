@@ -199,6 +199,32 @@ Les chemins de stockage sont construits uniquement à partir d'UUID générés p
 serveur. Le nom de fichier fourni par le client est désinfecté et conservé pour
 l'affichage seul — il n'entre jamais dans la construction d'un chemin.
 
+## Tableau de bord — `/stats`
+
+`GET /stats/dashboard` renvoie les agrégats affichés par le frontend : compteurs
+patients et analyses, répartition bénin/malin, série mensuelle sur douze mois,
+temps d'inférence moyen, versions de modèle en service.
+
+Ouvert à **tous les rôles**, `researcher` compris : ces chiffres ne désignent
+aucune patiente, et c'est précisément le périmètre de ce rôle, à qui les dossiers
+nominatifs restent fermés.
+
+Les mois sans activité sont renvoyés à zéro plutôt qu'omis : un axe temporel
+troué se lit comme une baisse là où il n'y a qu'une absence de données.
+
+### Aucune « précision du modèle » n'est publiée
+
+La spécification d'origine demandait un taux de précision. L'API renvoie à la
+place `accuracy_available: false` et une note explicative, pour une raison de
+fond : **aucun taux d'exactitude n'est calculable.** Il faudrait un diagnostic de
+référence par cas — biopsie, suivi — qui n'est pas enregistré.
+
+Le seul taux exposé est `doctor_validation_rate`, nommé « analyses relues par un
+médecin » dans l'interface. Il mesure l'activité de relecture, pas la justesse du
+modèle. Afficher ce chiffre sous le nom de « précision » laisserait croire que la
+performance a été mesurée alors qu'elle ne l'a jamais été — et, avec le modèle
+placeholder actuel, ce serait doublement faux.
+
 ## Rapport PDF
 
 `GET /analyses/{id}/report` produit le compte rendu s'il n'existe pas encore, puis

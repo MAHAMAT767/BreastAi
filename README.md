@@ -178,7 +178,7 @@ une absence de backend en échec de tests.
 - [x] **Phase 4** — Inférence EfficientNet + Grad-CAM *(modèle placeholder — voir l'avertissement)*
 - [x] **Phase 5** — Génération de rapports PDF
 - [x] **Phase 6a** — Frontend React : authentification et gestion des patients
-- [ ] **Phase 6b** — Frontend : upload, résultats + Grad-CAM, tableau de bord Recharts
+- [x] **Phase 6b** — Frontend : upload, résultats + Grad-CAM, tableau de bord Recharts
 - [ ] **Phase 7** — Assistant IA conversationnel avec disclaimer médical
 - [ ] **Phase 8** — Historique, recherche, tests end-to-end, CI
 

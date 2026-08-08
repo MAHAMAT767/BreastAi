@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import AnalysesList from '@/components/AnalysesList';
+import UploadMammography from '@/components/UploadMammography';
 import { Alert, Button, Spinner, buttonClasses } from '@/components/ui';
 import { PLACEHOLDER, formatBirthDate, formatDateTime } from '@/lib/format';
 import { useDeletePatient, usePatient } from '@/lib/patientQueries';
@@ -54,10 +56,13 @@ export default function PatientDetailPage() {
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!patientId) return;
-    await deletePatient.mutateAsync(patientId);
-    navigate('/patients', { replace: true });
+    // `mutate` et non `mutateAsync` : l'échec est déjà affiché sous le bouton,
+    // et un rejet sans `catch` remonterait en rejet non géré.
+    deletePatient.mutate(patientId, {
+      onSuccess: () => navigate('/patients', { replace: true }),
+    });
   }
 
   if (isPending) return <Spinner label="Chargement du dossier…" />;
@@ -156,9 +161,8 @@ export default function PatientDetailPage() {
 
       <MedicalHistory patient={patient} />
 
-      <section className="rounded-lg border border-dashed border-slate-300 px-5 py-6 text-sm text-slate-500">
-        Les analyses de mammographies de ce dossier seront accessibles ici en Phase 6b.
-      </section>
+      <UploadMammography patientId={patient.id} />
+      <AnalysesList patientId={patient.id} />
     </div>
   );
 }

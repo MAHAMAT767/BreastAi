@@ -9,9 +9,27 @@
   --color-brand-600: oklch(0.55 0.16 350);
   --color-brand-700: oklch(0.46 0.14 350);
 
-  /* Couleurs de résultat : jamais utilisées seules, toujours doublées d'un libellé. */
-  --color-benign: oklch(0.63 0.13 160);
-  --color-malignant: oklch(0.6 0.19 25);
+  /* ------------------------------------------------------------------------
+   * Couleurs des séries « bénin » / « malin ».
+   *
+   * Bleu et orange, et non vert et rouge. Le couple vert/rouge est
+   * indistinguable pour un lecteur deutéranope ou protanope — soit environ un
+   * homme sur douze, et un radiologue en fait partie aussi souvent que
+   * quiconque. Le couple retenu a été validé : écart CVD ΔE 24,7 et écart en
+   * vision normale 33,6 sur fond blanc, très au-dessus des seuils de 8 et 15.
+   *
+   * Ces couleurs ne portent jamais l'information seules : le libellé « Bénin »
+   * ou « Malin » accompagne systématiquement la couleur, dans les graphiques
+   * comme dans les pastilles. L'urgence clinique est portée par le texte et par
+   * la probabilité affichée, pas par la teinte.
+   * --------------------------------------------------------------------- */
+  --color-benign: #2a78d6;
+  --color-malignant: #eb6834;
+
+  /* Chrome des graphiques : discret, une nuance au-dessus de la surface. */
+  --color-chart-grid: #e1e0d9;
+  --color-chart-axis: #c3c2b7;
+  --color-chart-muted: #898781;
 }
 
 html {

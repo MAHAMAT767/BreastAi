@@ -2,6 +2,8 @@ import { Link, Route, Routes } from 'react-router-dom';
 
 import AppLayout from '@/components/AppLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AnalysisDetailPage from '@/pages/AnalysisDetailPage';
+import DashboardPage from '@/pages/DashboardPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/LoginPage';
@@ -73,6 +75,18 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/analyses/:analysisId"
+          element={
+            <ProtectedRoute roles={CLINICAL_ROLES}>
+              <AnalysisDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Le tableau de bord n'expose que des agrégats : ouvert à tous les
+            rôles, y compris chercheur, à qui les dossiers restent fermés. */}
+        <Route path="/tableau-de-bord" element={<DashboardPage />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Route>

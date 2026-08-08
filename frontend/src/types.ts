@@ -74,6 +74,115 @@ export interface PatientPayload {
   notes: string | null;
 }
 
+// --------------------------------------------------------------------------- //
+// Analyses
+// --------------------------------------------------------------------------- //
+
+export type AnalysisStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export const STATUS_LABELS: Record<AnalysisStatus, string> = {
+  pending: 'En attente',
+  processing: 'En cours',
+  completed: 'Terminée',
+  failed: 'Échec',
+};
+
+export type Prediction = 'benign' | 'malignant';
+
+export const PREDICTION_LABELS: Record<Prediction, string> = {
+  benign: 'Bénin',
+  malignant: 'Malin',
+};
+
+export interface SuspiciousRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Analysis {
+  id: string;
+  patient_id: string;
+  original_filename: string;
+  image_format: string | null;
+  file_size_bytes: number | null;
+  status: AnalysisStatus;
+
+  prediction: Prediction | null;
+  /** Probabilité de la classe **maligne**, quelle que soit la classe prédite. */
+  probability: number | null;
+  confidence: number | null;
+  inference_time_ms: number | null;
+  model_version: string | null;
+  preprocessing_version: string | null;
+  error_message: string | null;
+
+  doctor_comment: string | null;
+  doctor_validated: boolean;
+  created_at: string;
+
+  is_placeholder_model: boolean;
+  model_warning: string | null;
+  has_gradcam: boolean;
+  gradcam_disclaimer: string | null;
+  suspicious_region: SuspiciousRegion | null;
+  has_report: boolean;
+  report_generated_at: string | null;
+  report_signature: string | null;
+
+  disclaimer: string;
+}
+
+export type AnalysisImageKind = 'original' | 'processed' | 'gradcam';
+
+export interface AnalysisReview {
+  doctor_comment?: string | null;
+  doctor_validated?: boolean | null;
+}
+
+export interface ReportVerification {
+  analysis_id: string;
+  has_report: boolean;
+  signature_valid: boolean;
+  generated_at: string | null;
+  detail: string;
+}
+
+/** Formats acceptés par l'API, alignés sur `ALLOWED_EXTENSIONS` côté backend. */
+export const ACCEPTED_EXTENSIONS = ['.dcm', '.dicom', '.png', '.jpg', '.jpeg'] as const;
+export const MAX_UPLOAD_SIZE_MB = 50;
+
+// --------------------------------------------------------------------------- //
+// Tableau de bord
+// --------------------------------------------------------------------------- //
+
+export interface MonthlyCount {
+  month: string;
+  total: number;
+  benign: number;
+  malignant: number;
+}
+
+export interface DashboardStats {
+  total_patients: number;
+  total_analyses: number;
+  completed_analyses: number;
+  pending_analyses: number;
+  failed_analyses: number;
+  benign_count: number;
+  malignant_count: number;
+  average_inference_time_ms: number | null;
+  doctor_validated_count: number;
+  doctor_validation_rate: number | null;
+  monthly: MonthlyCount[];
+  model_versions: string[];
+  is_placeholder_model: boolean;
+  model_warning: string | null;
+  accuracy_available: boolean;
+  accuracy_note: string;
+}
+
 export interface Page<T> {
   items: T[];
   total: number;

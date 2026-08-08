@@ -43,6 +43,11 @@ export default function AppLayout() {
                 Patients
               </NavLink>
             )}
+            {/* Ouvert à tous les rôles : le tableau de bord n'expose que des
+                chiffres agrégés. */}
+            <NavLink to="/tableau-de-bord" className={navLinkClasses}>
+              Tableau de bord
+            </NavLink>
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
