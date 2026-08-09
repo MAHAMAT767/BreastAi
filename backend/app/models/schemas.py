@@ -342,8 +342,8 @@ class AssistantAsk(BaseModel):
 class AssistantAnswerRead(BaseModel):
     #: Texte complet, avertissements compris : c'est celui à citer ou à copier.
     answer: str
-    #: Réponse brute du modèle, sans les avertissements, pour que l'interface
-    #: les affiche avec leur mise en forme propre.
+    #: Réponse brute, sans les avertissements, pour que l'interface les mette
+    #: en forme séparément.
     answer_body: str
     model: str
     #: Rappelé sur chaque réponse, et déjà inclus dans le texte de `answer`.

@@ -196,7 +196,9 @@ def request_password_reset(
 
     if user is not None and user.is_active:
         token = create_password_reset_token(str(user.id), user.password_changed_at)
-        # TODO(phase 8) : envoyer par e-mail au lieu de journaliser.
+        # Faute d'envoi d'e-mail, le jeton part dans les journaux du serveur.
+        # Quiconque y a accès peut réinitialiser n'importe quel mot de passe :
+        # à brancher sur un envoi réel avant toute mise en production.
         logger.warning(
             "Jeton de réinitialisation généré pour %s (valable %s minutes) : %s",
             user.email,

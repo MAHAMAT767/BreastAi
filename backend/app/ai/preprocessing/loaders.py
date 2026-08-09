@@ -95,9 +95,8 @@ def load_dicom(data: bytes) -> np.ndarray:
     except InvalidDicomError as exc:
         raise ImageLoadError("Fichier DICOM invalide.") from exc
     except Exception as exc:  # pydicom lève des types variés selon le défaut
-        # Les transfer syntax compressées (JPEG Lossless, JPEG 2000) sont prises
-        # en charge via pylibjpeg, déclaré dans requirements.txt. Si ce message
-        # apparaît, vérifier que les greffons sont bien installés dans l'image.
+        # Les transfer syntax compressées passent par pylibjpeg : si ce message
+        # apparaît, vérifier que les greffons sont installés.
         logger.warning("Échec de décodage DICOM : %s", exc)
         raise ImageLoadError("Impossible de décoder les pixels du fichier DICOM.") from exc
 
@@ -132,7 +131,6 @@ def load_standard_image(data: bytes) -> np.ndarray:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     if image.dtype != np.uint8:
-        # PNG 16 bits : ramener sur 8 bits comme pour le DICOM.
         image = to_uint8(image)
 
     return image

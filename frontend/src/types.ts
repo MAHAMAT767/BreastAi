@@ -1,10 +1,8 @@
 /**
  * Types miroirs des schémas Pydantic du backend (`backend/app/models/schemas.py`).
  *
- * Écrits à la main plutôt que générés depuis l'OpenAPI : la surface est petite
- * et une génération automatique ajouterait une étape de build à maintenir. En
- * contrepartie, toute évolution d'un schéma côté backend doit être répercutée
- * ici — c'est le seul point de vigilance.
+ * Écrits à la main : toute évolution d'un schéma côté backend doit être
+ * répercutée ici.
  */
 
 export type UserRole = 'admin' | 'doctor' | 'researcher';

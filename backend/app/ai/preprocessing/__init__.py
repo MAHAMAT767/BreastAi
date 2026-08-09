@@ -12,7 +12,7 @@ Chaîne appliquée à chaque image avant l'inférence :
 
 La même chaîne doit être appliquée à l'entraînement et à l'inférence : c'est le
 rôle de `PREPROCESSING_VERSION`, enregistrée avec chaque analyse. L'augmentation
-(Albumentations, Phase 4) ne concerne que l'entraînement.
+ne concerne que l'entraînement.
 """
 
 from app.ai.preprocessing.loaders import (

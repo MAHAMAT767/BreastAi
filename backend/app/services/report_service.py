@@ -114,10 +114,8 @@ def format_probability(value: float | None) -> str:
 def build_automatic_summary(analysis: Analysis, is_placeholder: bool) -> str:
     """Synthèse rédigée à partir des valeurs enregistrées.
 
-    Texte déterministe issu des chiffres de l'analyse, et non d'un modèle de
-    langage : la Phase 7 branchera l'assistant conversationnel. Le distinguer
-    évite de laisser croire qu'un raisonnement a eu lieu là où il n'y a qu'un
-    gabarit.
+    Gabarit déterministe issu des chiffres, et non un modèle de langage : le
+    distinguer évite de laisser croire qu'un raisonnement a eu lieu.
     """
     if is_placeholder:
         return (

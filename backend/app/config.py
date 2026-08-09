@@ -46,17 +46,16 @@ class Settings(BaseSettings):
     password_reset_token_expire_minutes: int = 30
 
     # ---------- Limitation de débit ----------
-    #: Désactivable pour les tests. Le stockage est en mémoire, par processus :
-    #: voir la réserve multi-instance dans app/auth/rate_limit.py.
+    #: Compteurs en mémoire, par processus : avec N instances, le quota réel est
+    #: N fois celui annoncé. Voir docs/PRODUCTION_CHECKLIST.md.
     rate_limit_enabled: bool = True
     login_rate_limit: str = "10/minute"
     password_reset_rate_limit: str = "5/minute"
-    #: Chaque question à l'assistant consomme du crédit chez le fournisseur :
-    #: le quota est ici une protection budgétaire autant qu'une protection
-    #: contre les abus.
+    #: Chaque question consomme du crédit chez le fournisseur : ce quota protège
+    #: le budget autant que le service.
     assistant_rate_limit: str = "10/minute"
 
-    # ---------- Assistant conversationnel (Phase 7) ----------
+    # ---------- Assistant conversationnel ----------
     #: Sans jeton, l'assistant est désactivé et l'API le dit explicitement
     #: plutôt que d'échouer à l'appel.
     huggingface_api_token: str | None = None
@@ -65,31 +64,26 @@ class Settings(BaseSettings):
     assistant_max_tokens: int = 400
     assistant_temperature: float = 0.2
     assistant_timeout_seconds: float = 45.0
-    #: Nombre de tours conservés dans l'historique envoyé au modèle. Chaque tour
-    #: est refacturé à chaque question : au-delà, le coût grimpe sans que la
-    #: réponse s'améliore.
     assistant_history_turns: int = 6
 
     # ---------- Compte administrateur initial ----------
-    # Utilisé une seule fois par `python -m app.database.init_db`.
     first_admin_email: str | None = None
     first_admin_password: str | None = None
     first_admin_name: str = "Administrateur BreastAI"
 
     # ---------- CORS ----------
-    #: `NoDecode` désactive le décodage JSON que pydantic-settings applique par
-    #: défaut aux champs de type complexe lus depuis l'environnement. Sans lui,
-    #: la valeur `CORS_ORIGINS=a,b` — celle que documente .env.example — fait
-    #: échouer le démarrage avant même que le validateur ci-dessous ne s'exécute.
+    #: `NoDecode` désactive le décodage JSON que pydantic-settings applique aux
+    #: champs de type complexe. Sans lui, `CORS_ORIGINS=a,b` — la forme que
+    #: documente .env.example — fait échouer le démarrage avant le validateur.
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"]
     )
 
-    # ---------- Stockage (Phase 3) ----------
+    # ---------- Stockage ----------
     upload_dir: str = "./uploads"
     max_upload_size_mb: int = 50
 
-    # ---------- IA (Phase 4) ----------
+    # ---------- Modèle ----------
     model_path: str = "./models/breastai_efficientnet.pt"
     model_device: str = "cpu"
 

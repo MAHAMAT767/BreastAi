@@ -1,9 +1,4 @@
-/**
- * Primitives d'interface partagées.
- *
- * Regroupées dans un seul fichier tant qu'elles tiennent en quelques dizaines de
- * lignes : un fichier par bouton coûterait plus en navigation qu'il ne rapporte.
- */
+/** Primitives d'interface partagées. */
 
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
@@ -29,8 +24,7 @@ export function Alert({
 }) {
   return (
     <div
-      // `role="alert"` fait annoncer le message par les lecteurs d'écran dès
-      // son apparition : une erreur de connexion muette est inaccessible.
+      // Annonce le message aux lecteurs d'écran dès son apparition.
       role="alert"
       className={`rounded-lg border px-4 py-3 text-sm ${ALERT_STYLES[variant]}`}
     >
@@ -127,11 +121,9 @@ const BUTTON_STYLES: Record<ButtonVariant, string> = {
 };
 
 /**
- * Classes d'un bouton, exposées séparément.
- *
- * Un lien de navigation doit rester un `<a>` — l'envelopper dans un `<button>`
- * casserait l'ouverture dans un nouvel onglet et la copie d'adresse. Cette
- * fonction permet de lui donner l'apparence d'un bouton sans changer sa nature.
+ * Donne à un lien l'apparence d'un bouton sans changer sa nature : un `<a>`
+ * enveloppé dans un `<button>` perd l'ouverture en nouvel onglet et la copie
+ * d'adresse.
  */
 export function buttonClasses(variant: ButtonVariant = 'primary', extra = ''): string {
   return (
@@ -158,8 +150,7 @@ export function Button({
     <button
       {...props}
       disabled={disabled || loading}
-      // `aria-busy` signale l'attente aux technologies d'assistance, que le
-      // changement de libellé seul ne transmet pas toujours.
+      // Signale l'attente aux technologies d'assistance.
       aria-busy={loading}
       className={buttonClasses(
         variant,

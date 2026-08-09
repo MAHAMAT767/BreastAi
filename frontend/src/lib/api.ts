@@ -31,7 +31,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 
-  /** Le compte n'est pas autorisé, par opposition à non authentifié. */
   get isForbidden(): boolean {
     return this.status === 403;
   }
@@ -41,7 +40,6 @@ export class ApiError extends Error {
   }
 }
 
-/** Messages par défaut : le `detail` brut de FastAPI n'est pas montrable à un médecin. */
 const STATUS_MESSAGES: Record<number, string> = {
   400: 'Requête invalide.',
   401: 'Session expirée. Veuillez vous reconnecter.',
@@ -54,11 +52,9 @@ const STATUS_MESSAGES: Record<number, string> = {
 };
 
 /**
- * Extrait un message lisible d'une réponse d'erreur.
- *
- * FastAPI renvoie `detail` sous forme de chaîne pour une `HTTPException`, mais
- * sous forme de liste d'objets pour une erreur de validation Pydantic : les deux
- * formes doivent être traitées, sinon l'interface affiche `[object Object]`.
+ * FastAPI renvoie `detail` en chaîne pour une `HTTPException`, mais en liste
+ * d'objets pour une erreur de validation Pydantic. Sans traiter les deux formes,
+ * l'interface affiche `[object Object]`.
  */
 function extractMessage(status: number, body: unknown): string {
   const fallback = STATUS_MESSAGES[status] ?? `Erreur ${status}.`;

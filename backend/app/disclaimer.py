@@ -1,12 +1,10 @@
-"""Avertissement médical, source unique pour tout le backend.
+"""Avertissements accompagnant toute sortie du système, source unique.
 
-Isolé dans son propre module parce qu'il est requis à la fois par l'application
-(`app.main`), par les schémas de réponse (`app.models.schemas`) et, en Phase 7,
-par l'assistant conversationnel. Le faire vivre dans `app.main` créerait un
-import circulaire.
+Module isolé pour éviter un import circulaire : `app.main`, les schémas de
+réponse et l'assistant en ont tous besoin.
 
-Ce texte accompagne toute sortie du système. Ne pas le retirer d'une réponse
-d'analyse, d'un rapport ou d'un message de l'assistant.
+Ne retirer aucun de ces textes d'une réponse d'analyse, d'un rapport ou d'un
+message de l'assistant.
 """
 
 from __future__ import annotations

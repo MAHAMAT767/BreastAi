@@ -16,7 +16,6 @@ from app.config import settings
 #: deux mots de passe distincts partager un hash, on refuse explicitement.
 MAX_PASSWORD_BYTES: Final[int] = 72
 
-#: Longueur minimale imposée à la création et à la réinitialisation.
 MIN_PASSWORD_LENGTH: Final[int] = 12
 
 #: Marge tolérée en comparant l'horodatage du mot de passe porté par un jeton à

@@ -1,20 +1,16 @@
-"""Entraînement et fine-tuning du classifieur (Phase 4+).
+"""Entraînement et fine-tuning du classifieur. Module encore vide.
 
-Approche : transfer learning depuis EfficientNet pré-entraîné sur ImageNet,
-tête de classification remplacée par une sortie à 2 classes
-(`app.ai.CLASS_NAMES`). Évolutions envisagées : ConvNeXt, Swin Transformer.
+Transfer learning depuis EfficientNet pré-entraîné sur ImageNet, tête de
+classification remplacée par une sortie à 2 classes (`app.ai.CLASS_NAMES`).
 
-Points d'attention propres au domaine médical :
-    - séparation train/val/test **par patient**, jamais par image, sous peine de
-      fuite de données et de métriques trompeuses ;
-    - déséquilibre des classes : pondération de la perte ou échantillonnage ;
-    - le rappel (recall) sur la classe maligne prime sur l'accuracy globale —
-      un faux négatif coûte infiniment plus cher qu'un faux positif.
+Trois exigences propres au domaine, à ne pas perdre de vue le jour où ce module
+sera écrit :
 
-Modules prévus :
-    dataset.py    — `MammographyDataset`, découpage par patient
-    model.py      — construction du réseau et remplacement de la tête
-    train.py      — boucle d'entraînement, early stopping, journalisation
-    validate.py   — évaluation par époque
-    checkpoint.py — sauvegarde/restauration des poids vers `models/`
+- séparation train/val/test **par patient**, jamais par image : deux clichés
+  d'une même patiente de part et d'autre créent une fuite de données et des
+  métriques trompeuses ;
+- déséquilibre des classes à corriger, par pondération de la perte ou par
+  échantillonnage ;
+- le rappel sur la classe maligne prime sur l'accuracy globale — un faux négatif
+  coûte infiniment plus cher qu'un faux positif.
 """

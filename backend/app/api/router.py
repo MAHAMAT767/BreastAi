@@ -14,4 +14,3 @@ api_router.include_router(patients.router)
 api_router.include_router(analyses.router)
 api_router.include_router(stats.router)
 api_router.include_router(assistant.router)
-#   api_router.include_router(assistant.router)  # Phase 7
