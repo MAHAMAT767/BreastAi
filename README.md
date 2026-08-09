@@ -62,6 +62,7 @@ Upload → Prétraitement → EfficientNet → Classification → Grad-CAM → L
 
 ```
 BreastAI/
+├── .github/           # Workflows d'intégration continue
 ├── frontend/          # Application React (Vite + TypeScript + Tailwind)
 ├── backend/
 │   └── app/
@@ -169,7 +170,24 @@ cd frontend && npm run test:integration
 ```
 
 Ils s'ignorent d'eux-mêmes si l'API n'est pas joignable, pour ne pas transformer
-une absence de backend en échec de tests.
+une absence de backend en échec de tests. En intégration continue, où ce silence
+donnerait un vert mensonger, `VITE_REQUIRE_API=1` fait échouer la suite au lieu
+de l'ignorer.
+
+## Intégration continue
+
+`.github/workflows/ci.yml` s'exécute sur chaque *pull request* et sur `main` :
+
+| Job | Contenu |
+|-----|---------|
+| **backend** | `ruff check` puis `pytest` |
+| **migrations** | `alembic upgrade head`, aller-retour `downgrade`/`upgrade`, `alembic check` contre un vrai PostgreSQL 16 |
+| **frontend** | `tsc --noEmit`, `vitest`, `vite build` |
+| **end-to-end** | Pile complète — PostgreSQL, API démarrée, suite d'intégration du frontend |
+
+Aucun déploiement automatique : la CI valide, elle ne publie rien. Elle n'appelle
+aucun service payant — `HUGGINGFACE_API_TOKEN` y est vide et les tests de
+l'assistant simulent le fournisseur.
 
 ## Feuille de route
 
@@ -181,7 +199,7 @@ une absence de backend en échec de tests.
 - [x] **Phase 6a** — Frontend React : authentification et gestion des patients
 - [x] **Phase 6b** — Frontend : upload, résultats + Grad-CAM, tableau de bord Recharts
 - [x] **Phase 7** — Assistant IA conversationnel avec disclaimer médical
-- [ ] **Phase 8** — Historique, recherche, tests end-to-end, CI
+- [x] **Phase 8** — Historique, recherche, tests end-to-end, CI
 
 ## Confidentialité des données
 

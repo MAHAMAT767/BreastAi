@@ -136,6 +136,15 @@ export interface Analysis {
 
 export type AnalysisImageKind = 'original' | 'processed' | 'gradcam';
 
+/** Filtres de l'historique. Chaînes vides = critère non appliqué. */
+export interface AnalysisFilters {
+  search: string;
+  prediction: '' | Prediction;
+  status: '' | AnalysisStatus;
+  dateFrom: string;
+  dateTo: string;
+}
+
 export interface AnalysisReview {
   doctor_comment?: string | null;
   doctor_validated?: boolean | null;
