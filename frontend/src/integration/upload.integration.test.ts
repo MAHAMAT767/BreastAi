@@ -38,6 +38,15 @@ async function apiIsReachable(): Promise<boolean> {
 
 const reachable = await apiIsReachable();
 
+// En intégration continue, une suite qui s'ignore est un vert mensonger :
+// `VITE_REQUIRE_API=1` transforme l'absence de backend en échec.
+if (process.env.VITE_REQUIRE_API === '1' && !reachable) {
+  throw new Error(
+    `VITE_REQUIRE_API=1 mais l'API est injoignable sur ${API_URL}. ` +
+      'Les tests de dépôt ne peuvent pas être ignorés dans ce contexte.',
+  );
+}
+
 /**
  * PNG 40×48 en niveaux de gris, valide et décodable par OpenCV.
  *

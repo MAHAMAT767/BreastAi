@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import (
@@ -67,10 +68,11 @@ async def upload_analysis(
     patient_id: Annotated[uuid.UUID, Form(description="Dossier patient rattaché.")],
     file: Annotated[UploadFile, File(description="DICOM, PNG, JPG ou JPEG.")],
 ) -> AnalysisRead:
-    """Dépose une mammographie, la valide et la prétraite.
+    """Dépose une mammographie, la valide, la prétraite et l'analyse.
 
-    L'inférence n'est pas encore branchée : l'analyse reste au statut `pending`
-    jusqu'à la Phase 4.
+    L'inférence et le Grad-CAM tournent dans la requête : l'analyse revient au
+    statut `completed`, ou `failed` si le modèle a échoué — le cliché reste alors
+    archivé et l'inférence rejouable.
     """
     patient = patient_service.get_by_id(db, patient_id)
     if patient is None:
@@ -107,21 +109,54 @@ async def upload_analysis(
     return AnalysisRead.from_analysis(analysis)
 
 
-@router.get("", response_model=Page[AnalysisRead], summary="Lister les analyses")
+@router.get(
+    "", response_model=Page[AnalysisRead], summary="Historique et recherche des analyses"
+)
 def list_analyses(
     db: DbSession,
     user: ClinicalUser,
-    patient_id: Annotated[uuid.UUID | None, Query(description="Filtrer sur un dossier.")] = None,
+    patient_id: Annotated[
+        uuid.UUID | None, Query(description="Restreindre à un dossier.")
+    ] = None,
+    search: Annotated[
+        str | None, Query(description="Code, prénom ou nom du patient.")
+    ] = None,
+    prediction: Annotated[
+        Literal["benign", "malignant"] | None, Query(description="Résultat du modèle.")
+    ] = None,
+    analysis_status: Annotated[
+        Literal["pending", "processing", "completed", "failed"] | None,
+        Query(alias="status", description="État de l'analyse."),
+    ] = None,
+    date_from: Annotated[
+        date | None, Query(description="Analyses à partir de cette date incluse.")
+    ] = None,
+    date_to: Annotated[
+        date | None, Query(description="Analyses jusqu'à cette date incluse.")
+    ] = None,
+    doctor_validated: Annotated[
+        bool | None, Query(description="Filtrer sur la validation par le médecin.")
+    ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[AnalysisRead]:
+    """Historique des analyses, filtrable par patient, date et diagnostic."""
     del user
-    analyses = analysis_service.list_analyses(
-        db, patient_id=patient_id, limit=limit, offset=offset
+
+    filters = analysis_service.AnalysisFilters(
+        patient_id=patient_id,
+        search=search,
+        prediction=prediction,
+        status=analysis_status,
+        date_from=date_from,
+        date_to=date_to,
+        doctor_validated=doctor_validated,
     )
+
+    analyses = analysis_service.list_analyses(db, filters, limit=limit, offset=offset)
     return Page[AnalysisRead](
         items=[AnalysisRead.from_analysis(analysis) for analysis in analyses],
-        total=analysis_service.count_analyses(db, patient_id=patient_id),
+        total=analysis_service.count_analyses(db, filters),
         limit=limit,
         offset=offset,
     )
