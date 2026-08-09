@@ -52,3 +52,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Fichiers de travail locaux, hors du depot
+commande.md
