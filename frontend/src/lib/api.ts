@@ -268,13 +268,36 @@ export function deletePatient(id: string): Promise<MessageResponse> {
 
 export interface AnalysisQuery {
   patientId?: string;
+  search?: string;
+  prediction?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  doctorValidated?: boolean;
   limit?: number;
   offset?: number;
 }
 
 export function fetchAnalyses(query: AnalysisQuery = {}): Promise<Page<Analysis>> {
   const params = new URLSearchParams();
-  if (query.patientId) params.set('patient_id', query.patientId);
+
+  // Un critère vide est omis, jamais envoyé vide : `prediction=` serait refusé
+  // par le serveur, qui n'accepte que `benign` ou `malignant`.
+  const optional: Record<string, string | undefined> = {
+    patient_id: query.patientId,
+    search: query.search?.trim() || undefined,
+    prediction: query.prediction,
+    status: query.status,
+    date_from: query.dateFrom,
+    date_to: query.dateTo,
+  };
+  for (const [key, value] of Object.entries(optional)) {
+    if (value) params.set(key, value);
+  }
+  if (query.doctorValidated !== undefined) {
+    params.set('doctor_validated', String(query.doctorValidated));
+  }
+
   params.set('limit', String(query.limit ?? 20));
   params.set('offset', String(query.offset ?? 0));
 

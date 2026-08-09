@@ -2,6 +2,7 @@ import { Link, Route, Routes } from 'react-router-dom';
 
 import AppLayout from '@/components/AppLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AnalysesHistoryPage from '@/pages/AnalysesHistoryPage';
 import AnalysisDetailPage from '@/pages/AnalysisDetailPage';
 import DashboardPage from '@/pages/DashboardPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
@@ -72,6 +73,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={CLINICAL_ROLES}>
               <PatientFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analyses"
+          element={
+            <ProtectedRoute roles={CLINICAL_ROLES}>
+              <AnalysesHistoryPage />
             </ProtectedRoute>
           }
         />

@@ -72,7 +72,7 @@ est logique : les analyses déjà rendues restent rattachées, un compte rendu r
 | Méthode | Chemin | Description |
 |---------|--------|-------------|
 | `POST` | `/analyses` | Déposer une mammographie (`multipart` : `patient_id`, `file`). |
-| `GET` | `/analyses` | Lister — `patient_id`, `limit`, `offset`. |
+| `GET` | `/analyses` | Historique et recherche — voir ci-dessous. |
 | `GET` | `/analyses/{id}` | Consulter une analyse. |
 | `GET` | `/analyses/{id}/image` | Image `processed` (défaut), `original` ou `gradcam`. |
 | `POST` | `/analyses/{id}/infer` | Rejouer l'inférence sur le cliché archivé. |
@@ -80,6 +80,32 @@ est logique : les analyses déjà rendues restent rattachées, un compte rendu r
 | `GET` | `/analyses/{id}/report` | Télécharger le compte rendu PDF (produit à la demande). |
 | `POST` | `/analyses/{id}/report` | Régénérer le rapport, renvoie l'empreinte. |
 | `GET` | `/analyses/{id}/report/verify` | Contrôler l'empreinte du rapport archivé. |
+
+### Historique et recherche
+
+`GET /analyses` accepte les critères suivants, cumulables :
+
+| Paramètre | Effet |
+|-----------|-------|
+| `patient_id` | Restreint à un dossier. |
+| `search` | Code, prénom ou nom du patient, sans distinction de casse. |
+| `prediction` | `benign` ou `malignant`. Toute autre valeur : `422`. |
+| `status` | `pending`, `processing`, `completed`, `failed`. |
+| `date_from` / `date_to` | Bornes de date, **incluses toutes les deux**. |
+| `doctor_validated` | `true` / `false`. |
+| `limit` / `offset` | Pagination, 100 éléments au maximum par page. |
+
+Deux points d'implémentation qui évitent des bugs classiques :
+
+- **`date_to` est inclusive.** La borne haute est posée au lendemain minuit, en
+  strict. Une borne posée au jour même à minuit ferait disparaître toute la
+  journée demandée — une analyse de 14 h ne serait jamais trouvée.
+- **Le tri départage à identifiant égal** (`created_at DESC, id`). Sans cela,
+  deux analyses de même horodatage peuvent changer de place entre deux pages, et
+  l'une d'elles n'apparaître sur aucune.
+
+Le comptage et la liste partagent exactement les mêmes conditions : les séparer
+finit toujours par produire un total qui ne correspond pas aux lignes affichées.
 
 ### Validation d'un dépôt
 

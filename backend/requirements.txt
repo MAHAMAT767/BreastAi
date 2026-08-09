@@ -16,6 +16,12 @@ pyjwt==2.10.1
 email-validator==2.2.0
 slowapi==0.1.9
 
+# ---------- Assistant conversationnel (Phase 7) ----------
+# httpx est une dépendance d'exécution, pas de test : `app.services.assistant_service`
+# l'importe pour appeler le fournisseur. Il n'était déclaré que côté développement,
+# et l'API refusait de démarrer depuis ce fichier seul — trouvé par la CI.
+httpx==0.28.1
+
 # ---------- Imagerie (Phase 3) ----------
 numpy==2.2.1
 # Variante « headless » : la variante standard tire des bibliothèques GUI

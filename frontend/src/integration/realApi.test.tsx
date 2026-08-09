@@ -47,6 +47,15 @@ async function apiIsReachable(): Promise<boolean> {
 
 const reachable = await apiIsReachable();
 
+// En intégration continue, une suite qui s'ignore est un vert mensonger :
+// `VITE_REQUIRE_API=1` transforme l'absence de backend en échec.
+if (import.meta.env.VITE_REQUIRE_API === '1' && !reachable) {
+  throw new Error(
+    `VITE_REQUIRE_API=1 mais l'API est injoignable sur ${API_URL}. ` +
+      'Ces tests ne peuvent pas être ignorés dans ce contexte.',
+  );
+}
+
 /** Code unique par exécution : les tests écrivent dans une vraie base. */
 function uniqueCode(): string {
   return `TCD-IT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;

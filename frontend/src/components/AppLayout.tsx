@@ -39,9 +39,14 @@ export default function AppLayout() {
             {/* Le lien n'apparaît pas pour un chercheur : l'API lui répondrait
                 403, autant ne pas lui proposer une porte fermée. */}
             {hasRole(...CLINICAL_ROLES) && (
-              <NavLink to="/patients" className={navLinkClasses}>
-                Patients
-              </NavLink>
+              <>
+                <NavLink to="/patients" className={navLinkClasses}>
+                  Patients
+                </NavLink>
+                <NavLink to="/analyses" end className={navLinkClasses}>
+                  Analyses
+                </NavLink>
+              </>
             )}
             {/* Ouvert à tous les rôles : le tableau de bord n'expose que des
                 chiffres agrégés. */}
