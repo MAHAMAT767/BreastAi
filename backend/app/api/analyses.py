@@ -23,7 +23,6 @@ from sqlalchemy.orm import Session
 from app.ai.inference import is_placeholder_version
 from app.auth.dependencies import ClinicalUser
 from app.database.session import get_db
-from app.disclaimer import PLACEHOLDER_MODEL_WARNING
 from app.models.analysis import Analysis
 from app.models.audit_log import AuditAction
 from app.models.schemas import (
@@ -313,14 +312,15 @@ def regenerate_report(
         detail="Rapport régénéré",
     )
 
-    is_placeholder = is_placeholder_version(analysis.model_version)
+    # `model_warning` et `model_status` sont dérivés par le schéma : un seul
+    # endroit décide du texte affiché.
     return ReportInfo(
         analysis_id=analysis.id,
         signature=result.signature,
         generated_at=result.generated_at,
         size_bytes=len(result.pdf),
-        is_placeholder_model=is_placeholder,
-        model_warning=PLACEHOLDER_MODEL_WARNING if is_placeholder else None,
+        is_placeholder_model=is_placeholder_version(analysis.model_version),
+        clinically_validated=analysis.clinically_validated,
     )
 
 

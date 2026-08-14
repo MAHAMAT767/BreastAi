@@ -66,6 +66,8 @@ export function makeAnalysis(overrides: Partial<Analysis> = {}): Analysis {
     doctor_validated: false,
     created_at: '2026-08-01T09:30:00Z',
     is_placeholder_model: true,
+    clinically_validated: false,
+    model_status: 'placeholder',
     model_warning: '⚠️ MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE.',
     has_gradcam: true,
     gradcam_disclaimer:
@@ -99,6 +101,8 @@ export function makeStats(overrides: Partial<DashboardStats> = {}): DashboardSta
     ],
     model_versions: ['placeholder-efficientnet_b0-imagenet'],
     is_placeholder_model: true,
+    clinically_validated: false,
+    model_status: 'placeholder',
     model_warning: '⚠️ MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE.',
     accuracy_available: false,
     accuracy_note:

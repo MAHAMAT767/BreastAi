@@ -17,6 +17,7 @@ from sqlalchemy import (
     String,
     Text,
     Uuid,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -108,6 +109,20 @@ class Analysis(Base, TimestampMixin):
     #: Sans elle, impossible de savoir a posteriori si une analyse ancienne est
     #: comparable à une analyse récente.
     preprocessing_version: Mapped[str | None] = mapped_column(String(20))
+    #: Le modèle ayant produit **ce** résultat était-il validé cliniquement ?
+    #:
+    #: Enregistré par analyse, et non relu du modèle courant : déployer un jour
+    #: un modèle validé ne doit pas effacer rétroactivement l'avertissement des
+    #: analyses rendues auparavant par un modèle qui ne l'était pas. C'est la
+    #: même raison qui fait conserver `model_version`.
+    #:
+    #: `NOT NULL` avec défaut `False` : une analyse dont la provenance est
+    #: inconnue — les lignes antérieures à cette colonne, notamment — est traitée
+    #: comme non validée. L'inverse ferait apparaître des résultats comme
+    #: cliniquement fiables par simple effet de migration.
+    clinically_validated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     error_message: Mapped[str | None] = mapped_column(Text)
 
     # ---------- Zone saillante Grad-CAM ----------

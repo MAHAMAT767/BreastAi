@@ -204,6 +204,9 @@ def run_inference(
     analysis.inference_time_ms = prediction.inference_time_ms
     analysis.model_version = prediction.model_version
     analysis.preprocessing_version = result.version
+    # Figé au moment de l'inférence : le remplacement ultérieur du modèle ne doit
+    # pas changer la provenance d'un résultat déjà rendu.
+    analysis.clinically_validated = prediction.clinically_validated
     analysis.gradcam_path = gradcam_path
 
     if region is not None:

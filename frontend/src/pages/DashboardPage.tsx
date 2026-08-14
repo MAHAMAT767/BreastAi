@@ -1,4 +1,4 @@
-import PlaceholderModelWarning from '@/components/PlaceholderModelWarning';
+import ModelProvenanceWarning from '@/components/ModelProvenanceWarning';
 import {
   MonthlyAnalysesChart,
   PredictionSplit,
@@ -45,8 +45,8 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      {data.is_placeholder_model && data.model_warning && (
-        <PlaceholderModelWarning message={data.model_warning} />
+      {data.model_warning && (
+        <ModelProvenanceWarning status={data.model_status} message={data.model_warning} />
       )}
 
       <section aria-label="Indicateurs" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

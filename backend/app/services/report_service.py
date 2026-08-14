@@ -47,7 +47,9 @@ from app.config import settings
 from app.disclaimer import (
     GRADCAM_DISCLAIMER,
     MEDICAL_DISCLAIMER,
-    PLACEHOLDER_MODEL_WARNING,
+    ModelStatus,
+    derive_model_status,
+    model_warning_for,
 )
 from app.models.analysis import Analysis, AnalysisStatus
 from app.models.patient import Patient
@@ -73,6 +75,19 @@ STATUS_LABELS_FR: Final[dict[str, str]] = {
 }
 
 WATERMARK_TEXT: Final[str] = "MODELE DE DEMONSTRATION - SANS VALEUR CLINIQUE"
+
+#: Filigrane du cas intermédiaire. Un rapport imprimé se détache de l'interface :
+#: sans marque sur le document lui-même, plus rien ne rappelle au lecteur que ces
+#: chiffres n'ont pas été validés.
+UNVALIDATED_WATERMARK_TEXT: Final[str] = "MODELE NON VALIDE CLINIQUEMENT - USAGE ACADEMIQUE"
+
+#: Filigrane à imprimer selon l'état du modèle. `None` pour un modèle validé :
+#: seul l'avertissement médical général subsiste alors.
+WATERMARK_BY_STATUS: Final[dict[ModelStatus, str | None]] = {
+    "placeholder": WATERMARK_TEXT,
+    "trained_unvalidated": UNVALIDATED_WATERMARK_TEXT,
+    "validated": None,
+}
 
 #: Largeur maximale d'une image dans le corps du document.
 IMAGE_WIDTH: Final[float] = 78 * mm
@@ -111,13 +126,13 @@ def format_probability(value: float | None) -> str:
     return "—" if value is None else f"{value * 100:.1f} %"
 
 
-def build_automatic_summary(analysis: Analysis, is_placeholder: bool) -> str:
+def build_automatic_summary(analysis: Analysis, status: ModelStatus) -> str:
     """Synthèse rédigée à partir des valeurs enregistrées.
 
     Gabarit déterministe issu des chiffres, et non un modèle de langage : le
     distinguer évite de laisser croire qu'un raisonnement a eu lieu.
     """
-    if is_placeholder:
+    if status == "placeholder":
         return (
             "Aucune synthèse n'est produite : le modèle déployé est un modèle de "
             "démonstration, ses sorties ne décrivent pas le cliché analysé."
@@ -139,6 +154,13 @@ def build_automatic_summary(analysis: Analysis, is_placeholder: bool) -> str:
             "La carte Grad-CAM fait ressortir une zone d'intérêt principale, "
             f"délimitée par le rectangle vert de l'image annotée "
             f"({analysis.region_width} × {analysis.region_height} pixels)."
+        )
+
+    if status == "trained_unvalidated":
+        sentences.append(
+            "Ces valeurs proviennent d'un modèle dont la validité clinique n'a "
+            "pas été établie : elles sont fournies à titre académique et "
+            "démonstratif."
         )
 
     sentences.append(
@@ -334,8 +356,11 @@ class _ReportCanvas(Canvas):
     donc accumulées puis rendues à la fermeture du document.
     """
 
-    def __init__(self, *args, watermark: bool = False, reference: str = "", **kwargs) -> None:
+    def __init__(
+        self, *args, watermark: str | None = None, reference: str = "", **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
+        #: Texte du filigrane, `None` pour ne rien imprimer.
         self._watermark = watermark
         self._reference = reference
         self._pages: list[dict] = []
@@ -361,11 +386,13 @@ class _ReportCanvas(Canvas):
         self.saveState()
         self.translate(width / 2, height / 2)
         self.rotate(38)
-        self.setFont("Helvetica-Bold", 21)
+        # Le texte du cas « non validé » est plus long : réduire le corps évite
+        # qu'il ne déborde de la page une fois incliné.
+        self.setFont("Helvetica-Bold", 21 if len(self._watermark) <= 46 else 15)
         # Rouge très clair : lisible sans masquer le texte ni les images.
         self.setFillColorRGB(0.85, 0.20, 0.20, alpha=0.16)
         for offset in (150, 0, -150):
-            self.drawCentredString(0, offset, WATERMARK_TEXT)
+            self.drawCentredString(0, offset, self._watermark)
         self.restoreState()
 
     def _draw_footer(self, total: int) -> None:
@@ -409,7 +436,7 @@ def build_pdf(
     generated_by: User | None,
     generated_at: datetime,
     signature: str,
-    is_placeholder: bool,
+    status: ModelStatus,
 ) -> bytes:
     """Assemble le document."""
     styles = _styles()
@@ -437,6 +464,8 @@ def build_pdf(
     )
     document.addPageTemplates([PageTemplate(id="rapport", frames=[frame])])
 
+    watermark_text = WATERMARK_BY_STATUS[status]
+
     story: list = []
 
     # ---------- En-tête ----------
@@ -453,8 +482,9 @@ def build_pdf(
     story.append(Spacer(1, 8))
 
     # ---------- Avertissement placeholder, avant tout le reste ----------
-    if is_placeholder:
-        story.append(_alert_box(PLACEHOLDER_MODEL_WARNING, styles))
+    provenance_warning = model_warning_for(status)
+    if provenance_warning:
+        story.append(_alert_box(provenance_warning, styles))
         story.append(Spacer(1, 8))
 
     # ---------- Patient ----------
@@ -564,7 +594,7 @@ def build_pdf(
     # ---------- Synthèse et lecture médicale ----------
     story.append(Paragraph("Synthèse automatique", styles["heading"]))
     story.append(
-        Paragraph(pdf_safe(build_automatic_summary(analysis, is_placeholder)), styles["body"])
+        Paragraph(pdf_safe(build_automatic_summary(analysis, status)), styles["body"])
     )
 
     story.append(Paragraph("Lecture médicale", styles["heading"]))
@@ -617,7 +647,7 @@ def build_pdf(
     document.build(
         story,
         canvasmaker=lambda *args, **kwargs: _ReportCanvas(
-            *args, watermark=is_placeholder, reference=reference, **kwargs
+            *args, watermark=watermark_text, reference=reference, **kwargs
         ),
     )
     return buffer.getvalue()
@@ -648,7 +678,9 @@ def generate_report(
 
     generated_at = datetime.now(UTC)
     signature = sign(signature_payload(analysis, patient, generated_at))
-    is_placeholder = is_placeholder_version(analysis.model_version)
+    status = derive_model_status(
+        is_placeholder_version(analysis.model_version), analysis.clinically_validated
+    )
 
     pdf = build_pdf(
         analysis=analysis,
@@ -656,7 +688,7 @@ def generate_report(
         generated_by=generated_by,
         generated_at=generated_at,
         signature=signature,
-        is_placeholder=is_placeholder,
+        status=status,
     )
 
     directory = storage_service.analysis_directory(analysis.patient_id, analysis.id)
@@ -667,10 +699,10 @@ def generate_report(
     db.refresh(analysis)
 
     logger.info(
-        "Rapport généré pour l'analyse %s (%d octets, placeholder=%s).",
+        "Rapport généré pour l'analyse %s (%d octets, modèle : %s).",
         analysis.id,
         len(pdf),
-        is_placeholder,
+        status,
     )
     return ReportResult(pdf=pdf, signature=signature, generated_at=generated_at)
 

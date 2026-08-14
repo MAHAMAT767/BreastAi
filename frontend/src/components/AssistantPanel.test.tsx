@@ -21,6 +21,8 @@ const ANSWER = {
   disclaimer:
     "BreastAI est un outil d'aide à la décision. Ses résultats ne remplacent pas l'avis d'un professionnel de santé qualifié.",
   is_placeholder_model: true,
+  clinically_validated: false,
+  model_status: 'placeholder' as const,
   model_warning: '⚠️ MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE.',
   context_sent: 'Contexte de l’analyse :\n- Patiente : 52 ans\n- Classification : bénin',
   usage: { total_tokens: 773 },

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import PlaceholderModelWarning from '@/components/PlaceholderModelWarning';
+import ModelProvenanceWarning from '@/components/ModelProvenanceWarning';
 import { Alert, Button, TextArea } from '@/components/ui';
 import { ApiError, askAssistant, fetchAssistantStatus } from '@/lib/api';
 import type { AssistantAnswer, AssistantMessage } from '@/types';
@@ -26,8 +26,8 @@ function AnswerBlock({ answer }: { answer: AssistantAnswer }) {
       {/* Les avertissements sont affichés séparément grâce à `answer_body`,
           plutôt que noyés dans le bloc de texte. Ils restent présents dans
           `answer` si la réponse est copiée ailleurs. */}
-      {answer.is_placeholder_model && answer.model_warning && (
-        <PlaceholderModelWarning message={answer.model_warning} />
+      {answer.model_warning && (
+        <ModelProvenanceWarning status={answer.model_status} message={answer.model_warning} />
       )}
 
       <p className="whitespace-pre-line text-sm leading-relaxed text-slate-800">

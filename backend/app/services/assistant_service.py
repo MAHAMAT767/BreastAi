@@ -39,7 +39,9 @@ from app.config import settings
 from app.disclaimer import (
     GRADCAM_DISCLAIMER,
     MEDICAL_DISCLAIMER,
-    PLACEHOLDER_MODEL_WARNING,
+    ModelStatus,
+    derive_model_status,
+    model_warning_for,
 )
 from app.models.analysis import Analysis, AnalysisStatus
 from app.models.patient import Patient
@@ -82,6 +84,7 @@ class AssistantAnswer:
     model: str
     disclaimer: str = MEDICAL_DISCLAIMER
     is_placeholder_model: bool = False
+    clinically_validated: bool = False
     model_warning: str | None = None
     context_sent: str = ""
     usage: dict[str, int] = field(default_factory=dict)
@@ -133,6 +136,27 @@ PLACEHOLDER_SYSTEM_RULE: Final[str] = "\n" + (
     "l'on t'interroge dessus, tu commences par rappeler qu'ils n'ont aucune "
     "valeur."
 )
+
+#: Consigne du cas intermédiaire. Le risque n'est pas le même que pour le
+#: placeholder : ici les sorties dépendent bien du cliché, ce qui les rend
+#: crédibles. L'assistant doit donc pouvoir les commenter, mais jamais les
+#: présenter comme un résultat fiable.
+UNVALIDATED_SYSTEM_RULE: Final[str] = "\n" + (
+    "8. IMPORTANT : le modèle qui a produit ces résultats est entraîné mais "
+    "n'a fait l'objet d'AUCUNE VALIDATION CLINIQUE. Il a appris sur un jeu de "
+    "données restreint et ses performances réelles sont inconnues. Tu peux "
+    "expliquer ce qu'il a produit, mais tu rappelles que ces sorties sont à "
+    "visée académique et démonstrative, et tu ne les présentes jamais comme un "
+    "élément fiable pour la prise en charge."
+)
+
+#: Règle système à ajouter selon l'état du modèle. Un modèle validé n'en reçoit
+#: aucune : les règles 1 à 7 et `MEDICAL_DISCLAIMER` s'appliquent toujours.
+SYSTEM_RULE_BY_STATUS: Final[dict[ModelStatus, str]] = {
+    "placeholder": PLACEHOLDER_SYSTEM_RULE,
+    "trained_unvalidated": UNVALIDATED_SYSTEM_RULE,
+    "validated": "",
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -203,10 +227,10 @@ def build_messages(
     context: str,
     question: str,
     history: list[AssistantMessage],
-    is_placeholder: bool,
+    status: ModelStatus,
 ) -> list[dict[str, str]]:
     """Assemble la conversation envoyée au fournisseur."""
-    system = SYSTEM_PROMPT + (PLACEHOLDER_SYSTEM_RULE if is_placeholder else "")
+    system = SYSTEM_PROMPT + SYSTEM_RULE_BY_STATUS[status]
 
     messages: list[dict[str, str]] = [{"role": "system", "content": system}]
 
@@ -283,7 +307,7 @@ def _call_provider(messages: list[dict[str, str]]) -> tuple[str, dict[str, int]]
     }
 
 
-def compose_answer(raw_answer: str, is_placeholder: bool) -> str:
+def compose_answer(raw_answer: str, status: ModelStatus) -> str:
     """Encadre la réponse du modèle par les avertissements obligatoires.
 
     Ajoutés par le code et non demandés au modèle : à la mise au point, celui-ci
@@ -291,10 +315,14 @@ def compose_answer(raw_answer: str, is_placeholder: bool) -> str:
     système explicite. Les rattacher au texte lui-même — et pas seulement à un
     champ de la réponse — fait qu'ils suivent la réponse si elle est copiée
     ailleurs.
+
+    `MEDICAL_DISCLAIMER` est ajouté dans les trois cas, y compris pour un modèle
+    validé : il ne dépend pas de la provenance du modèle.
     """
     parts: list[str] = []
-    if is_placeholder:
-        parts.append(PLACEHOLDER_MODEL_WARNING)
+    warning = model_warning_for(status)
+    if warning:
+        parts.append(warning)
     parts.append(raw_answer)
     parts.append(MEDICAL_DISCLAIMER)
     return "\n\n".join(parts)
@@ -321,8 +349,9 @@ def ask(
         )
 
     is_placeholder = is_placeholder_version(analysis.model_version)
+    status = derive_model_status(is_placeholder, analysis.clinically_validated)
     context = build_context(analysis, patient)
-    messages = build_messages(context, cleaned, history or [], is_placeholder)
+    messages = build_messages(context, cleaned, history or [], status)
 
     raw_answer, usage = _call_provider(messages)
 
@@ -334,11 +363,12 @@ def ask(
     )
 
     return AssistantAnswer(
-        answer=compose_answer(raw_answer, is_placeholder),
+        answer=compose_answer(raw_answer, status),
         answer_body=raw_answer,
         model=settings.assistant_model,
         is_placeholder_model=is_placeholder,
-        model_warning=PLACEHOLDER_MODEL_WARNING if is_placeholder else None,
+        clinically_validated=analysis.clinically_validated,
+        model_warning=model_warning_for(status),
         context_sent=context,
         usage=usage,
     )

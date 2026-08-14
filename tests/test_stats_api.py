@@ -26,6 +26,7 @@ def add_analysis(
     inference_time_ms: float | None = 500.0,
     validated: bool = False,
     model_version: str = "placeholder-efficientnet_b0-imagenet",
+    clinically_validated: bool = False,
     created_at: datetime | None = None,
 ) -> Analysis:
     analysis = Analysis(
@@ -38,6 +39,7 @@ def add_analysis(
         confidence=0.6,
         inference_time_ms=inference_time_ms,
         model_version=model_version,
+        clinically_validated=clinically_validated,
         doctor_validated=validated,
     )
     db.add(analysis)
@@ -62,6 +64,10 @@ def test_empty_dashboard(client: TestClient, doctor_headers: dict[str, str]) -> 
     assert body["average_inference_time_ms"] is None
     assert body["doctor_validation_rate"] is None
     assert body["is_placeholder_model"] is False
+    # Un tableau vide n'est pas une validation : sans aucune analyse, rien ne
+    # permet d'affirmer qu'un modèle validé est en service.
+    assert body["clinically_validated"] is False
+    assert body["model_status"] == "trained_unvalidated"
 
 
 def test_counts_by_prediction_and_status(
@@ -156,18 +162,64 @@ def test_placeholder_model_is_reported(
     body = client.get(f"{PREFIX}/stats/dashboard", headers=doctor_headers).json()
 
     assert body["is_placeholder_model"] is True
+    assert body["model_status"] == "placeholder"
     assert "AUCUNE VALEUR CLINIQUE" in body["model_warning"]
 
 
-def test_real_model_carries_no_warning(
+def test_trained_but_unvalidated_model_still_warns(
     client: TestClient, db: Session, doctor_headers: dict[str, str], patient: Patient
 ) -> None:
-    add_analysis(db, patient, model_version="efficientnet_b0-cbis-ddsm-v1")
+    """Ne plus être un placeholder ne suffit pas à faire disparaître le bandeau."""
+    add_analysis(db, patient, model_version="efficientnet_b0-mini-mias-v1")
 
     body = client.get(f"{PREFIX}/stats/dashboard", headers=doctor_headers).json()
 
     assert body["is_placeholder_model"] is False
+    assert body["clinically_validated"] is False
+    assert body["model_status"] == "trained_unvalidated"
+    assert body["model_warning"] is not None
+    assert "NON VALIDÉ CLINIQUEMENT" in body["model_warning"]
+
+
+def test_validated_model_carries_no_provenance_warning(
+    client: TestClient, db: Session, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    add_analysis(
+        db,
+        patient,
+        model_version="efficientnet_b0-cbis-ddsm-v1",
+        clinically_validated=True,
+    )
+
+    body = client.get(f"{PREFIX}/stats/dashboard", headers=doctor_headers).json()
+
+    assert body["is_placeholder_model"] is False
+    assert body["clinically_validated"] is True
+    assert body["model_status"] == "validated"
     assert body["model_warning"] is None
+
+
+def test_one_unvalidated_analysis_is_enough_to_warn(
+    client: TestClient, db: Session, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    """Le tableau de bord agrège : il doit porter l'avertissement le plus sévère."""
+    add_analysis(
+        db,
+        patient,
+        model_version="efficientnet_b0-cbis-ddsm-v1",
+        clinically_validated=True,
+    )
+    add_analysis(
+        db,
+        patient,
+        model_version="efficientnet_b0-mini-mias-v1",
+        clinically_validated=False,
+    )
+
+    body = client.get(f"{PREFIX}/stats/dashboard", headers=doctor_headers).json()
+
+    assert body["clinically_validated"] is False
+    assert body["model_status"] == "trained_unvalidated"
 
 
 def test_model_versions_are_listed(

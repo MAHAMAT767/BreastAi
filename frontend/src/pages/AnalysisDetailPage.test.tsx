@@ -52,6 +52,7 @@ describe("Résultat d'analyse", () => {
   it("affiche l'avertissement de modèle de démonstration en tête", async () => {
     openAnalysis({
       is_placeholder_model: true,
+      model_status: 'placeholder',
       model_warning: '⚠️ MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE. Bruit.',
     });
 
@@ -62,15 +63,37 @@ describe("Résultat d'analyse", () => {
     expect(alerts[0].textContent?.match(/AUCUNE VALEUR CLINIQUE/g)).toHaveLength(1);
   });
 
-  it("n'affiche aucun avertissement pour un modèle entraîné", async () => {
+  // Le cas qui a motivé la séparation des deux notions : un modèle réellement
+  // entraîné, mais dont la valeur clinique n'a jamais été établie, ne doit pas
+  // passer pour un modèle validé sous prétexte qu'il n'est plus un placeholder.
+  it("avertit pour un modèle entraîné mais non validé cliniquement", async () => {
     openAnalysis({
       is_placeholder_model: false,
+      clinically_validated: false,
+      model_status: 'trained_unvalidated',
+      model_warning:
+        '⚠️ MODÈLE ENTRAÎNÉ MAIS NON VALIDÉ CLINIQUEMENT — à visée académique.',
+      model_version: 'efficientnet_b0-mini-mias-v1',
+    });
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts[0]).toHaveTextContent(/NON VALIDÉ CLINIQUEMENT/);
+    // Et surtout : ce n'est pas l'avertissement du placeholder qui s'affiche.
+    expect(alerts[0]).not.toHaveTextContent(/AUCUNE VALEUR CLINIQUE/);
+  });
+
+  it("n'affiche aucun avertissement de provenance pour un modèle validé", async () => {
+    openAnalysis({
+      is_placeholder_model: false,
+      clinically_validated: true,
+      model_status: 'validated',
       model_warning: null,
       model_version: 'efficientnet_b0-cbis-ddsm-v1',
     });
 
     await screen.findByText('efficientnet_b0-cbis-ddsm-v1');
-    expect(screen.queryByText(/Modèle de démonstration/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AUCUNE VALEUR CLINIQUE/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/NON VALIDÉ CLINIQUEMENT/)).not.toBeInTheDocument();
   });
 
   it('rappelle la limite du Grad-CAM', async () => {

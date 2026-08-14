@@ -46,11 +46,29 @@ class DashboardStats:
     doctor_validation_rate: float | None
     model_versions: list[str]
     is_placeholder_model: bool
+    clinically_validated: bool
     monthly: list[MonthlyBucket] = field(default_factory=list)
 
 
 def _completed() -> Select:
     return select(Analysis).where(Analysis.status == AnalysisStatus.COMPLETED.value)
+
+
+def _all_analyses_validated(db: Session) -> bool:
+    """Aucune analyse terminée ne provient-elle d'un modèle non validé ?
+
+    Formulé par la négative — on cherche un contre-exemple — pour que le cas
+    incertain retombe du côté prudent.
+    """
+    unvalidated = db.scalar(
+        select(func.count())
+        .select_from(Analysis)
+        .where(
+            Analysis.status == AnalysisStatus.COMPLETED.value,
+            Analysis.clinically_validated.is_(False),
+        )
+    )
+    return not unvalidated
 
 
 def _count(db: Session, *conditions) -> int:
@@ -172,5 +190,9 @@ def build_dashboard(db: Session, *, now: datetime | None = None) -> DashboardSta
         doctor_validation_rate=(validated / completed) if completed else None,
         model_versions=sorted(versions),
         is_placeholder_model=any(is_placeholder_version(version) for version in versions),
+        # `all` et non `any` : il suffit d'une analyse issue d'un modèle non
+        # validé pour que le tableau de bord doive porter l'avertissement. Un
+        # tableau vide n'est pas non plus une validation — d'où le `and`.
+        clinically_validated=bool(completed) and _all_analyses_validated(db),
         monthly=_monthly_counts(db, reference),
     )

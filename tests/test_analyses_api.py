@@ -6,6 +6,8 @@ exercé de bout en bout, à travers le même endpoint que le frontend utilisera.
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -14,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.ai import CLASS_NAMES
 from app.ai.preprocessing import detect_format
 from app.config import settings
-from app.models.analysis import AnalysisStatus
+from app.models.analysis import Analysis, AnalysisStatus
 from app.models.audit_log import AuditAction, AuditLog
 from app.models.patient import Patient
 from app.models.user import User
@@ -120,8 +122,61 @@ def test_placeholder_results_are_flagged_without_ambiguity(
     body = upload(client, doctor_headers, patient, make_png_bytes()).json()
 
     assert body["is_placeholder_model"] is True
+    assert body["clinically_validated"] is False
+    assert body["model_status"] == "placeholder"
     assert body["model_version"].startswith("placeholder-")
     assert "AUCUNE VALEUR CLINIQUE" in body["model_warning"]
+
+
+def test_trained_but_unvalidated_model_still_warns(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient, db: Session
+) -> None:
+    """Le cas qui a motivé la séparation des deux notions.
+
+    Un modèle réellement entraîné — donc `is_placeholder_model=False` — mais dont
+    la validité clinique n'a pas été établie doit déclencher le bandeau « non
+    validé cliniquement », et **non** l'absence de bandeau. C'est exactement ce
+    que produirait un checkpoint mini-MIAS déposé dans `MODEL_PATH`.
+    """
+    analysis_id = upload(client, doctor_headers, patient, make_png_bytes()).json()["id"]
+
+    # On simule la provenance d'un modèle entraîné mais non validé, telle qu'elle
+    # est enregistrée par l'inférence.
+    analysis = db.get(Analysis, uuid.UUID(analysis_id))
+    analysis.model_version = "efficientnet_b0-mini-mias-v1"
+    analysis.clinically_validated = False
+    db.commit()
+
+    body = client.get(f"/api/v1/analyses/{analysis_id}", headers=doctor_headers).json()
+
+    assert body["is_placeholder_model"] is False
+    assert body["clinically_validated"] is False
+    assert body["model_status"] == "trained_unvalidated"
+    # Un avertissement est bien rendu — l'absence de bandeau serait la régression.
+    assert body["model_warning"] is not None
+    assert "NON VALIDÉ CLINIQUEMENT" in body["model_warning"]
+    # Et ce n'est pas celui du placeholder, qui décrirait faussement du bruit.
+    assert "AUCUNE VALEUR CLINIQUE" not in body["model_warning"]
+    # Le disclaimer médical général reste présent dans les trois états.
+    assert "ne remplacent pas l'avis" in body["disclaimer"]
+
+
+def test_clinically_validated_model_drops_only_the_provenance_warning(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient, db: Session
+) -> None:
+    """Seul un modèle validé perd le bandeau — le disclaimer médical, jamais."""
+    analysis_id = upload(client, doctor_headers, patient, make_png_bytes()).json()["id"]
+
+    analysis = db.get(Analysis, uuid.UUID(analysis_id))
+    analysis.model_version = "efficientnet_b0-valide-v1"
+    analysis.clinically_validated = True
+    db.commit()
+
+    body = client.get(f"/api/v1/analyses/{analysis_id}", headers=doctor_headers).json()
+
+    assert body["model_status"] == "validated"
+    assert body["model_warning"] is None
+    assert "ne remplacent pas l'avis" in body["disclaimer"]
 
 
 def test_gradcam_response_carries_its_own_caveat(

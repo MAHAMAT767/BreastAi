@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import AssistantPanel from '@/components/AssistantPanel';
-import PlaceholderModelWarning from '@/components/PlaceholderModelWarning';
+import ModelProvenanceWarning from '@/components/ModelProvenanceWarning';
 import PredictionBadge from '@/components/PredictionBadge';
 import { Alert, Button, Spinner, TextArea } from '@/components/ui';
 import { ApiError, fetchReport } from '@/lib/api';
@@ -236,8 +236,8 @@ export default function AnalysisDetailPage() {
 
       {/* Avant tout le reste : les chiffres qui suivent n'ont aucune valeur
           clinique tant que le modèle est un placeholder. */}
-      {analysis.is_placeholder_model && analysis.model_warning && (
-        <PlaceholderModelWarning message={analysis.model_warning} />
+      {analysis.model_warning && (
+        <ModelProvenanceWarning status={analysis.model_status} message={analysis.model_warning} />
       )}
 
       {analysis.status === 'failed' && (

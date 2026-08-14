@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api import analyses, assistant, auth, health, patients, stats, users
+from app.api import analyses, assistant, auth, health, model, patients, stats, users
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -14,3 +14,4 @@ api_router.include_router(patients.router)
 api_router.include_router(analyses.router)
 api_router.include_router(stats.router)
 api_router.include_router(assistant.router)
+api_router.include_router(model.router)
