@@ -25,7 +25,9 @@ from app.auth.security import MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH
 from app.disclaimer import (
     GRADCAM_DISCLAIMER,
     MEDICAL_DISCLAIMER,
-    PLACEHOLDER_MODEL_WARNING,
+    ModelStatus,
+    derive_model_status,
+    model_warning_for,
 )
 from app.models.email_address import EmailAddress
 
@@ -240,11 +242,19 @@ class AnalysisRead(BaseModel):
     doctor_validated: bool
     created_at: datetime
 
-    # ---------- Champs calculés ----------
-    #: Vrai tant qu'aucun modèle entraîné sur mammographies n'est déployé.
+    # ---------- Provenance du modèle ----------
+    #: Le modèle n'avait jamais été entraîné sur des mammographies.
     is_placeholder_model: bool = False
-    #: Renseigné uniquement dans ce cas, avec un texte sans ambiguïté.
+    #: Sa valeur clinique avait-elle été établie ? Question distincte de la
+    #: précédente : un modèle peut être entraîné sans être validé.
+    clinically_validated: bool = False
+    #: Les deux drapeaux réduits à l'état à afficher, pour que l'interface n'ait
+    #: pas à les recombiner elle-même.
+    model_status: ModelStatus = "placeholder"
+    #: Texte de l'avertissement correspondant, `None` si le modèle est validé.
     model_warning: str | None = None
+
+    # ---------- Autres champs calculés ----------
     has_gradcam: bool = False
     gradcam_disclaimer: str | None = None
     suspicious_region: SuspiciousRegionRead | None = None
@@ -257,15 +267,18 @@ class AnalysisRead(BaseModel):
 
     @model_validator(mode="after")
     def _annotate_model_provenance(self) -> AnalysisRead:
-        """Dérive les avertissements du `model_version` enregistré.
+        """Dérive les avertissements de la provenance enregistrée.
 
-        La provenance est déduite de la valeur stockée, et non d'un état courant :
-        une analyse produite par le placeholder reste signalée comme telle même
-        après le déploiement d'un vrai modèle.
+        Les deux drapeaux viennent de valeurs stockées avec l'analyse — le
+        préfixe de `model_version` et la colonne `clinically_validated` — et non
+        de l'état du modèle courant : une analyse produite par un modèle non
+        validé reste signalée comme telle après le déploiement d'un modèle validé.
         """
         self.is_placeholder_model = is_placeholder_version(self.model_version)
-        if self.is_placeholder_model:
-            self.model_warning = PLACEHOLDER_MODEL_WARNING
+        self.model_status = derive_model_status(
+            self.is_placeholder_model, self.clinically_validated
+        )
+        self.model_warning = model_warning_for(self.model_status)
         if self.has_gradcam:
             self.gradcam_disclaimer = GRADCAM_DISCLAIMER
         return self
@@ -308,7 +321,17 @@ class ReportInfo(BaseModel):
     generated_at: datetime
     size_bytes: int
     is_placeholder_model: bool
+    clinically_validated: bool = False
+    model_status: ModelStatus = "placeholder"
     model_warning: str | None = None
+
+    @model_validator(mode="after")
+    def _attach_model_status(self) -> ReportInfo:
+        self.model_status = derive_model_status(
+            self.is_placeholder_model, self.clinically_validated
+        )
+        self.model_warning = model_warning_for(self.model_status)
+        return self
 
 
 class ReportVerification(BaseModel):
@@ -349,11 +372,21 @@ class AssistantAnswerRead(BaseModel):
     #: Rappelé sur chaque réponse, et déjà inclus dans le texte de `answer`.
     disclaimer: str = MEDICAL_DISCLAIMER
     is_placeholder_model: bool = False
+    clinically_validated: bool = False
+    model_status: ModelStatus = "placeholder"
     model_warning: str | None = None
     #: Contexte exact transmis au fournisseur, renvoyé pour que l'utilisateur
     #: puisse vérifier ce qui est sorti de l'établissement.
     context_sent: str = ""
     usage: dict[str, int] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _attach_model_status(self) -> AssistantAnswerRead:
+        self.model_status = derive_model_status(
+            self.is_placeholder_model, self.clinically_validated
+        )
+        self.model_warning = model_warning_for(self.model_status)
+        return self
 
 
 class AssistantStatus(BaseModel):
@@ -406,7 +439,13 @@ class DashboardStats(BaseModel):
     monthly: list[MonthlyCount]
     model_versions: list[str]
 
+    #: Vrai dès qu'**une** analyse du périmètre vient du placeholder.
     is_placeholder_model: bool
+    #: Vrai seulement si **toutes** les analyses viennent d'un modèle validé.
+    #: Un tableau de bord qui mélange les provenances doit afficher
+    #: l'avertissement le plus sévère, pas le plus flatteur.
+    clinically_validated: bool = False
+    model_status: ModelStatus = "placeholder"
     model_warning: str | None = None
 
     #: Toujours faux en l'état — voir `accuracy_note`.
@@ -415,8 +454,10 @@ class DashboardStats(BaseModel):
 
     @model_validator(mode="after")
     def _attach_model_warning(self) -> DashboardStats:
-        if self.is_placeholder_model and self.model_warning is None:
-            self.model_warning = PLACEHOLDER_MODEL_WARNING
+        self.model_status = derive_model_status(
+            self.is_placeholder_model, self.clinically_validated
+        )
+        self.model_warning = model_warning_for(self.model_status)
         return self
 
 

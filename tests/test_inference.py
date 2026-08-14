@@ -127,6 +127,55 @@ def test_checkpoint_threshold_is_honoured(tmp_path: Path) -> None:
     assert load_checkpoint(path, DEVICE).threshold == 0.2
 
 
+# --------------------------------------------------------------------------- #
+# Validation clinique
+# --------------------------------------------------------------------------- #
+
+
+def test_trained_model_is_not_validated_by_default(tmp_path: Path) -> None:
+    """Être entraîné ne vaut pas être validé : les deux notions sont disjointes."""
+    path = tmp_path / "modele.pt"
+    torch.save(valid_checkpoint(), path)  # sans clé `clinically_validated`
+
+    bundle = load_checkpoint(path, DEVICE)
+
+    assert bundle.is_placeholder is False
+    assert bundle.clinically_validated is False
+
+
+def test_placeholder_is_never_clinically_validated() -> None:
+    assert build_placeholder(DEVICE).clinically_validated is False
+
+
+def test_clinically_validated_requires_exactly_true(tmp_path: Path) -> None:
+    """Une valeur seulement « vraie au sens de Python » ne suffit pas.
+
+    Un `bool(...)` laisserait la chaîne "false" — ou n'importe quelle valeur non
+    vide écrite par erreur dans le checkpoint — déclarer le modèle validé.
+    """
+    # Un seul fichier, réécrit à chaque tour : un checkpoint pèse une vingtaine
+    # de mégaoctets, en écrire cinq d'un coup remplirait le disque pour rien.
+    path = tmp_path / "modele.pt"
+    for suspicious in ("true", "false", 1, [1], "oui"):
+        torch.save(valid_checkpoint(clinically_validated=suspicious), path)
+
+        assert load_checkpoint(path, DEVICE).clinically_validated is False, suspicious
+
+
+def test_clinically_validated_is_carried_to_the_prediction(tmp_path: Path) -> None:
+    """Le drapeau doit survivre jusqu'au résultat : c'est là qu'il est lu."""
+    path = tmp_path / "modele.pt"
+    torch.save(valid_checkpoint(clinically_validated=True), path)
+    tensor = preprocess_for_inference(make_png_bytes()).tensor
+
+    bundle = load_checkpoint(path, DEVICE)
+    result = Predictor(bundle).predict(tensor)
+
+    assert bundle.clinically_validated is True
+    assert result.clinically_validated is True
+    assert result.is_placeholder is False
+
+
 def test_reversed_class_order_is_refused(tmp_path: Path) -> None:
     """Charger un tel modèle inverserait bénin et malin sans lever d'erreur."""
     path = tmp_path / "modele.pt"

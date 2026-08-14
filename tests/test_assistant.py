@@ -160,15 +160,29 @@ def test_context_reports_a_failed_analysis(
 
 
 def test_placeholder_rule_is_added_to_the_system_prompt() -> None:
-    messages = build_messages("contexte", "question", [], is_placeholder=True)
+    messages = build_messages("contexte", "question", [], "placeholder")
 
     assert "DÉMONSTRATION" in messages[0]["content"]
 
 
 def test_placeholder_rule_disappears_for_a_trained_model() -> None:
-    messages = build_messages("contexte", "question", [], is_placeholder=False)
+    messages = build_messages("contexte", "question", [], "trained_unvalidated")
 
     assert "DÉMONSTRATION" not in messages[0]["content"]
+
+
+def test_unvalidated_rule_is_added_for_a_trained_but_unvalidated_model() -> None:
+    """Un modèle entraîné non validé reçoit sa propre consigne, pas le silence."""
+    messages = build_messages("contexte", "question", [], "trained_unvalidated")
+
+    assert "AUCUNE VALIDATION CLINIQUE" in messages[0]["content"]
+
+
+def test_validated_model_receives_no_provenance_rule() -> None:
+    messages = build_messages("contexte", "question", [], "validated")
+
+    assert "DÉMONSTRATION" not in messages[0]["content"]
+    assert "AUCUNE VALIDATION CLINIQUE" not in messages[0]["content"]
 
 
 def test_history_is_truncated(monkeypatch) -> None:
@@ -179,7 +193,7 @@ def test_history_is_truncated(monkeypatch) -> None:
         for index in range(20)
     ]
 
-    messages = build_messages("contexte", "question", history, is_placeholder=False)
+    messages = build_messages("contexte", "question", history, "trained_unvalidated")
 
     # système + 2 tours (4 messages) + la question courante
     assert len(messages) == 6
@@ -189,7 +203,7 @@ def test_history_is_truncated(monkeypatch) -> None:
 def test_empty_history_messages_are_dropped() -> None:
     history = [AssistantMessage(role="user", content="   ")]
 
-    messages = build_messages("contexte", "question", history, is_placeholder=False)
+    messages = build_messages("contexte", "question", history, "trained_unvalidated")
 
     assert len(messages) == 2
 
@@ -201,21 +215,29 @@ def test_empty_history_messages_are_dropped() -> None:
 
 def test_disclaimer_is_appended_by_code() -> None:
     """Le modèle n'est pas chargé de se souvenir de l'avertissement."""
-    composed = compose_answer("Réponse du modèle.", is_placeholder=False)
+    composed = compose_answer("Réponse du modèle.", "validated")
 
     assert "Réponse du modèle." in composed
     assert "ne remplacent pas l'avis" in composed
 
 
 def test_placeholder_warning_precedes_the_answer() -> None:
-    composed = compose_answer("Réponse du modèle.", is_placeholder=True)
+    composed = compose_answer("Réponse du modèle.", "placeholder")
 
     assert composed.index("AUCUNE VALEUR CLINIQUE") < composed.index("Réponse du modèle.")
 
 
+def test_unvalidated_warning_precedes_the_answer() -> None:
+    """Le cas intermédiaire porte lui aussi son avertissement dans le texte."""
+    composed = compose_answer("Réponse du modèle.", "trained_unvalidated")
+
+    assert composed.index("NON VALIDÉ CLINIQUEMENT") < composed.index("Réponse du modèle.")
+    assert "ne remplacent pas l'avis" in composed
+
+
 def test_warnings_survive_a_model_that_ignores_its_instructions() -> None:
     """À la mise au point, le modèle a omis l'avertissement une fois sur deux."""
-    composed = compose_answer("Cette image est clairement cancéreuse.", is_placeholder=True)
+    composed = compose_answer("Cette image est clairement cancéreuse.", "placeholder")
 
     assert "AUCUNE VALEUR CLINIQUE" in composed
     assert "ne remplacent pas l'avis" in composed

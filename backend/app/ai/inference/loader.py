@@ -14,6 +14,7 @@ voir l'avertissement en tête de `build_placeholder`.
             "preprocessing_version": "v1",
             "threshold": 0.5,
             "version": "efficientnet_b0-cbis-ddsm-v1",
+            "clinically_validated": False,
             "state_dict": model.state_dict(),
         },
         "models/breastai_efficientnet.pt",
@@ -24,6 +25,13 @@ et un écart fait échouer le démarrage plutôt que de produire des prédiction
 silencieusement fausses. Un modèle entraîné sur un autre prétraitement, ou dont
 l'ordre des classes diffère, donnerait des résultats inversés sans lever la
 moindre erreur.
+
+`clinically_validated` est facultatif et vaut `False` en son absence. Il ne dit
+pas la même chose que `is_placeholder` : le premier répond « ce modèle a-t-il été
+entraîné ? », le second « sa valeur clinique a-t-elle été établie ? ». Un modèle
+entraîné sur 115 images est `is_placeholder=False` et `clinically_validated=False`
+— voir `DEFAULT_CLINICALLY_VALIDATED` pour ce qui autorise à passer le second à
+`True`.
 """
 
 from __future__ import annotations
@@ -61,6 +69,22 @@ DEFAULT_ARCHITECTURE: Final[str] = "efficientnet_b0"
 #: exploitable cliniquement. L'API s'en sert pour marquer ses réponses.
 PLACEHOLDER_PREFIX: Final[str] = "placeholder-"
 
+#: Valeur de `clinically_validated` en l'absence de la clé dans un checkpoint.
+#:
+#: ⚠️ Ce défaut ne doit jamais devenir `True`, et aucune ligne de ce projet ne
+#: doit calculer cette valeur : ni depuis `is_placeholder`, ni depuis un seuil de
+#: métriques, ni depuis la taille du jeu d'entraînement. Un modèle affiche de
+#: bonnes métriques sur son propre jeu de test bien avant d'avoir la moindre
+#: valeur clinique — automatiser ce passage reviendrait à laisser un score
+#: décider qu'un logiciel peut servir à décider d'une prise en charge.
+#:
+#: Seule une **revue humaine documentée, menée hors de ce projet** — validation
+#: sur une cohorte externe, examen par des radiologues, traçabilité de la
+#: décision et responsabilité identifiée — justifie d'écrire
+#: `"clinically_validated": True` à la main dans le checkpoint. En attendant,
+#: l'absence de la clé et sa présence à `False` sont équivalentes et sûres.
+DEFAULT_CLINICALLY_VALIDATED: Final[bool] = False
+
 #: Graine de la tête de classification du placeholder. Fixée pour que deux
 #: démarrages successifs donnent la même sortie sur la même image : des
 #: prédictions qui changeraient à chaque redémarrage seraient encore plus
@@ -91,6 +115,10 @@ class ModelBundle:
     class_names: tuple[str, ...]
     threshold: float
     preprocessing_version: str
+    #: Notion **indépendante** de `is_placeholder`. Un modèle peut être
+    #: parfaitement entraîné (`is_placeholder=False`) sans avoir la moindre
+    #: valeur clinique établie. Voir `DEFAULT_CLINICALLY_VALIDATED`.
+    clinically_validated: bool = DEFAULT_CLINICALLY_VALIDATED
 
     @property
     def target_layer(self) -> nn.Module:
@@ -161,6 +189,7 @@ def build_placeholder(device: torch.device) -> ModelBundle:
         class_names=CLASS_NAMES,
         threshold=DEFAULT_THRESHOLD,
         preprocessing_version=PREPROCESSING_VERSION,
+        clinically_validated=DEFAULT_CLINICALLY_VALIDATED,
     )
 
 
@@ -222,7 +251,26 @@ def load_checkpoint(path: Path, device: torch.device) -> ModelBundle:
             "de substitution et ne peut pas nommer un modèle entraîné."
         )
 
-    logger.info("Modèle %s chargé depuis %s (%s).", version, path, architecture)
+    # Comparaison stricte à `True` plutôt que `bool(...)` : une clé laissée à
+    # "yes", 1 ou "false" ne doit pas suffire à déclarer un modèle validé
+    # cliniquement. Tout ce qui n'est pas exactement `True` vaut « non validé ».
+    clinically_validated = checkpoint.get(
+        "clinically_validated", DEFAULT_CLINICALLY_VALIDATED
+    ) is True
+
+    logger.info(
+        "Modèle %s chargé depuis %s (%s, validé cliniquement : %s).",
+        version,
+        path,
+        architecture,
+        clinically_validated,
+    )
+    if not clinically_validated:
+        logger.warning(
+            "Le modèle %s n'est pas déclaré validé cliniquement : ses résultats "
+            "restent à visée académique et démonstrative.",
+            version,
+        )
 
     return ModelBundle(
         model=model,
@@ -233,6 +281,7 @@ def load_checkpoint(path: Path, device: torch.device) -> ModelBundle:
         class_names=CLASS_NAMES,
         threshold=float(checkpoint.get("threshold", DEFAULT_THRESHOLD)),
         preprocessing_version=PREPROCESSING_VERSION,
+        clinically_validated=clinically_validated,
     )
 
 

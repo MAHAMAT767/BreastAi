@@ -132,7 +132,7 @@ def ask_about_analysis(
         answer_body=answer.answer_body,
         model=answer.model,
         is_placeholder_model=answer.is_placeholder_model,
-        model_warning=answer.model_warning,
+        clinically_validated=answer.clinically_validated,
         context_sent=answer.context_sent,
         usage=answer.usage,
     )

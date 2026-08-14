@@ -150,9 +150,68 @@ sans prédiction.
 | `confidence` | Probabilité de la classe effectivement prédite |
 | `inference_time_ms` | Durée du passage avant |
 | `model_version` | Modèle ayant produit ce résultat |
+| `is_placeholder_model` | Le modèle n'avait jamais été entraîné |
+| `clinically_validated` | Sa valeur clinique avait-elle été établie — question **distincte** |
+| `model_status` | Les deux drapeaux réduits à un état : `placeholder`, `trained_unvalidated`, `validated` |
+| `model_warning` | Texte de l'avertissement correspondant, `null` si le modèle est validé |
 
 Le seuil de décision vient du modèle, pas d'un `0.5` codé en dur : en dépistage,
 il se règle sur la sensibilité voulue.
+
+### Provenance du modèle : trois états, pas deux
+
+« Entraîné » et « validé cliniquement » sont deux questions différentes, et les
+confondre est dangereux : un modèle entraîné sur 115 images produit des sorties
+plausibles — donc crédibles — sans avoir la moindre valeur clinique établie. Deux
+booléens indépendants les portent, et `model_status` les résume.
+
+| `model_status` | `is_placeholder_model` | `clinically_validated` | Ce que voient l'interface et le PDF |
+|----------------|------------------------|------------------------|-------------------------------------|
+| `placeholder` | `true` | `false` | Bandeau rouge « MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE » + filigrane |
+| `trained_unvalidated` | `false` | `false` | Bandeau ambre « MODÈLE ENTRAÎNÉ MAIS NON VALIDÉ CLINIQUEMENT » + filigrane |
+| `validated` | `false` | `true` | Aucun bandeau de provenance |
+
+**Le disclaimer médical (`disclaimer`) est rendu dans les trois cas**, y compris
+pour un modèle validé. Il ne dépend pas de la provenance du modèle et n'est
+jamais retiré.
+
+`clinically_validated` est lu depuis le checkpoint (`"clinically_validated": true`)
+et **n'est jamais déduit** : ni de `is_placeholder_model`, ni d'un seuil de
+métriques, ni de la taille du jeu d'entraînement. Le chargeur exige la valeur
+booléenne `True` exactement — `"true"`, `1` ou toute autre valeur « vraie au sens
+de Python » vaut `False`. Seule une revue humaine documentée, menée hors de ce
+projet, justifie de la passer à `true` ; voir `DEFAULT_CLINICALLY_VALIDATED` dans
+`backend/app/ai/inference/loader.py`.
+
+La valeur est **enregistrée avec chaque analyse**, comme `model_version` :
+déployer un modèle validé ne retire pas rétroactivement l'avertissement des
+analyses produites auparavant par un modèle qui ne l'était pas.
+
+Les quatre réponses concernées portent les trois champs : résultat d'analyse,
+`ReportInfo`, réponse de l'assistant et tableau de bord. Sur le tableau de bord,
+qui agrège plusieurs analyses, `clinically_validated` n'est vrai que si **toutes**
+les analyses proviennent d'un modèle validé — l'avertissement le plus sévère
+l'emporte.
+
+### `GET /model` — état du modèle chargé
+
+Décrit le modèle **actuellement en service**, à distinguer de la provenance d'une
+analyse passée. Accessible à tout utilisateur connecté.
+
+```json
+{
+  "model_version": "efficientnet_b0-mini-mias-v1",
+  "architecture": "efficientnet_b0",
+  "class_names": ["benign", "malignant"],
+  "threshold": 0.42,
+  "preprocessing_version": "v1",
+  "is_placeholder_model": false,
+  "clinically_validated": false,
+  "model_status": "trained_unvalidated",
+  "model_warning": "⚠️ MODÈLE ENTRAÎNÉ MAIS NON VALIDÉ CLINIQUEMENT — …",
+  "disclaimer": "BreastAI est un outil d'aide à la décision…"
+}
+```
 
 > ### ⛔ Modèle actuellement déployé : placeholder sans valeur clinique
 >
@@ -171,6 +230,58 @@ il se règle sur la sensibilité voulue.
 >
 > Le préfixe est stocké en base : une analyse produite par le placeholder reste
 > reconnaissable comme telle même après le déploiement d'un vrai modèle.
+
+### Modèle intermédiaire mini-MIAS
+
+`notebooks/01_entrainement_mias_colab.ipynb` entraîne un premier modèle réel sur
+**mini-MIAS**, en attendant l'accès à Mini-DDSM. Il produit un checkpoint
+`efficientnet_b0-mini-mias-v1`, sans préfixe `placeholder-` et avec
+`clinically_validated: false` : une fois déployé, `is_placeholder_model` passe à
+`false`, `model_status` devient `trained_unvalidated`, et le bandeau
+d'avertissement **change** au lieu de disparaître — voir « Provenance du modèle »
+ci-dessus.
+
+> ### ⚠️ Ce modèle n'a vu que 115 mammographies
+>
+> mini-MIAS compte **322 clichés**, dont **207 normaux**. Le contrat de sortie
+> étant binaire (`benign`, `malignant` — voir « Remplacer le modèle » ci-dessous),
+> les images normales n'ont pas de classe où aller et sont écartées :
+> l'entraînement porte sur les **115 images lésionnelles** (63 bénignes,
+> 52 malignes), réparties en apprentissage, validation et test — soit une
+> vingtaine d'images par jeu de test.
+>
+> `mdb144`, qui porte à la fois une lésion bénigne et une lésion maligne, est
+> comptée maligne : l'inverse apprendrait au modèle qu'une image où siège un
+> cancer est une image bénigne.
+>
+> Sur un tel effectif, **chaque erreur pèse environ cinq points d'accuracy** :
+> les métriques de la fiche modèle situent un ordre de grandeur, elles ne
+> mesurent pas une performance.
+>
+> S'y ajoutent trois limites de fond :
+>
+> - mini-MIAS est un corpus de **films numérisés des années 1990**, non
+>   représentatif des mammographes numériques actuels ;
+> - le modèle n'a **jamais vu de cliché normal** : présenté à un sein sain, il
+>   répondra `benign` ou `malignant`, sans troisième possibilité ;
+> - aucune validation sur une population externe, ni par tranche d'âge, densité
+>   mammaire ou constructeur.
+>
+> C'est **plus limité encore que le futur modèle Mini-DDSM**, lui-même déjà
+> insuffisant pour un usage clinique. Ce modèle est un jalon technique — il
+> montre que la chaîne fonctionne avec de vrais poids — et doit être **remplacé
+> dès que Mini-DDSM est accessible**.
+
+Le fait que `is_placeholder_model` passe à `false` ne dit rien de la valeur
+clinique du modèle : ce drapeau distingue un modèle entraîné d'un modèle qui ne
+l'est pas, pas un modèle validé d'un modèle qui ne l'est pas. C'est
+`clinically_validated` qui répond à cette seconde question, et il reste à `false`
+pour ce modèle. **L'avertissement clinique rendu aux utilisateurs reste
+inchangé** : aucune décision médicale ne doit s'appuyer sur ces prédictions.
+
+Le notebook relit son propre checkpoint avec `load_checkpoint` avant de se
+terminer, et consigne dataset, découpage, métriques et limites dans une fiche
+modèle JSON déposée à côté des poids (voir `models/README.md`).
 
 ### Remplacer le modèle
 
@@ -502,6 +613,7 @@ Règle générale : valider strictement ce qui entre, ne jamais revalider ce qui
 | `logout` ne révoque pas le jeton | Le client doit l'effacer ; changer le mot de passe coupe toutes les sessions | — |
 | Domaines `.test`, `.invalid`, `localhost` refusés | Une adresse de test ne peut pas entrer dans un dossier patient — voir la section « Adresses e-mail » | délibéré |
 | Modèle placeholder | Aucune valeur clinique — voir l'encadré ci-dessus | dès qu'un dataset annoté est disponible |
+| Modèle mini-MIAS entraîné sur 115 images | Métriques mesurées sur une vingtaine d'images, corpus des années 1990, aucune classe `normal` — voir l'encadré ci-dessus | à remplacer par Mini-DDSM |
 | JPEG-LS non pris en charge | Nécessite `pyjpegls`, non installé. JPEG Lossless, JPEG 2000 et RLE fonctionnent | à arbitrer |
 | Stockage sur disque local, non chiffré | Les mammographies ne sont ni sauvegardées ni chiffrées au repos | avant déploiement |
 | Inférence synchrone | 500 à 1500 ms ajoutés à chaque dépôt | si le volume augmente |

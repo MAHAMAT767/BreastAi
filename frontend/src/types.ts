@@ -92,6 +92,14 @@ export const PREDICTION_LABELS: Record<Prediction, string> = {
   malignant: 'Malin',
 };
 
+/**
+ * Provenance du modèle, réduite par le serveur à un seul état.
+ *
+ * Calculée à partir de `is_placeholder_model` et `clinically_validated` — jamais
+ * stockée, jamais recombinée côté client : c'est le backend qui tranche.
+ */
+export type ModelStatus = 'placeholder' | 'trained_unvalidated' | 'validated';
+
 export interface SuspiciousRegion {
   x: number;
   y: number;
@@ -121,6 +129,8 @@ export interface Analysis {
   created_at: string;
 
   is_placeholder_model: boolean;
+  clinically_validated: boolean;
+  model_status: ModelStatus;
   model_warning: string | null;
   has_gradcam: boolean;
   gradcam_disclaimer: string | null;
@@ -177,6 +187,8 @@ export interface AssistantAnswer {
   model: string;
   disclaimer: string;
   is_placeholder_model: boolean;
+  clinically_validated: boolean;
+  model_status: ModelStatus;
   model_warning: string | null;
   /** Contexte exact transmis au fournisseur, pour vérification. */
   context_sent: string;
@@ -216,6 +228,8 @@ export interface DashboardStats {
   monthly: MonthlyCount[];
   model_versions: string[];
   is_placeholder_model: boolean;
+  clinically_validated: boolean;
+  model_status: ModelStatus;
   model_warning: string | null;
   accuracy_available: boolean;
   accuracy_note: string;

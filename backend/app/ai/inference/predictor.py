@@ -71,6 +71,7 @@ class Predictor:
             is_placeholder=self.bundle.is_placeholder,
             threshold=self.bundle.threshold,
             probabilities=scores,
+            clinically_validated=self.bundle.clinically_validated,
         )
 
 

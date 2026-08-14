@@ -101,21 +101,38 @@ describe('Honnêteté des chiffres', () => {
   });
 
   it('affiche l’avertissement de modèle de démonstration', async () => {
-    openDashboard({ is_placeholder_model: true });
+    openDashboard({ is_placeholder_model: true, model_status: 'placeholder' });
 
     const alerts = await screen.findAllByRole('alert');
     expect(alerts[0]).toHaveTextContent(/AUCUNE VALEUR CLINIQUE/);
   });
 
-  it('retire l’avertissement pour un modèle entraîné', async () => {
+  it('avertit pour un modèle entraîné mais non validé cliniquement', async () => {
     openDashboard({
       is_placeholder_model: false,
+      clinically_validated: false,
+      model_status: 'trained_unvalidated',
+      model_warning:
+        '⚠️ MODÈLE ENTRAÎNÉ MAIS NON VALIDÉ CLINIQUEMENT — à visée académique.',
+      model_versions: ['efficientnet_b0-mini-mias-v1'],
+    });
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts[0]).toHaveTextContent(/NON VALIDÉ CLINIQUEMENT/);
+  });
+
+  it('retire l’avertissement de provenance pour un modèle validé', async () => {
+    openDashboard({
+      is_placeholder_model: false,
+      clinically_validated: true,
+      model_status: 'validated',
       model_warning: null,
       model_versions: ['efficientnet_b0-cbis-ddsm-v1'],
     });
     await screen.findByText('Patients suivis');
 
     expect(screen.queryByText(/AUCUNE VALEUR CLINIQUE/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/NON VALIDÉ CLINIQUEMENT/)).not.toBeInTheDocument();
   });
 
   it('signale la coexistence de plusieurs versions de modèle', async () => {

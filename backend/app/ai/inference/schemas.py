@@ -22,6 +22,10 @@ class PredictionResult:
     is_placeholder: bool
     threshold: float
     probabilities: dict[str, float] = field(default_factory=dict)
+    #: Provenance clinique du modèle ayant produit ce résultat, indépendante de
+    #: `is_placeholder`. Le défaut est `False` : un résultat dont on ignore la
+    #: provenance est traité comme non validé.
+    clinically_validated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
