@@ -220,6 +220,76 @@ def test_unreadable_file_is_refused(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Intégrité des poids
+# --------------------------------------------------------------------------- #
+
+
+def test_untrained_backbone_is_refused(tmp_path: Path) -> None:
+    """Un corps resté celui d'ImageNet trahit un modèle jamais entraîné.
+
+    C'est un incident réel : un notebook dont la cellule de construction du
+    réseau avait été ré-exécutée après l'entraînement a sauvegardé un réseau
+    ImageNet intact, sous des métadonnées parfaitement conformes. Le fichier
+    passait toutes les autres validations et répondait 50 % à toute image.
+    """
+    path = tmp_path / "modele.pt"
+    imagenet = build_model(DEFAULT_ARCHITECTURE, pretrained=True)
+    torch.save(valid_checkpoint(state_dict=imagenet.state_dict()), path)
+
+    with pytest.raises(ModelLoadError, match="jamais été entraîné"):
+        load_checkpoint(path, DEVICE)
+
+
+def test_a_single_trained_tensor_is_enough_to_accept(tmp_path: Path) -> None:
+    """Le contrôle cherche un corps *identique*, pas un corps ressemblant.
+
+    Un pas de descente de gradient modifie tous les poids du corps ; en
+    perturber un seul suffit donc à distinguer un réseau ayant appris d'un
+    réseau vierge. Un seuil plus tolérant refuserait des modèles légitimes
+    faiblement ajustés.
+    """
+    path = tmp_path / "modele.pt"
+    state_dict = build_model(DEFAULT_ARCHITECTURE, pretrained=True).state_dict()
+    first_backbone_key = next(key for key in state_dict if key.startswith("features."))
+    state_dict[first_backbone_key] = state_dict[first_backbone_key] + 1e-3
+
+    torch.save(valid_checkpoint(state_dict=state_dict), path)
+
+    assert load_checkpoint(path, DEVICE).is_placeholder is False
+
+
+def test_head_alone_does_not_make_a_model_trained(tmp_path: Path) -> None:
+    """La tête est exclue de la comparaison, et doit l'être.
+
+    `build_model` la remplace à chaque construction : elle diffère d'ImageNet
+    même sur un réseau vierge. La compter ferait passer tout checkpoint pour
+    entraîné et viderait le contrôle de son sens.
+    """
+    path = tmp_path / "modele.pt"
+    state_dict = build_model(DEFAULT_ARCHITECTURE, pretrained=True).state_dict()
+    state_dict["classifier.1.weight"] = torch.randn_like(state_dict["classifier.1.weight"])
+    state_dict["classifier.1.bias"] = torch.randn_like(state_dict["classifier.1.bias"])
+
+    torch.save(valid_checkpoint(state_dict=state_dict), path)
+
+    with pytest.raises(ModelLoadError, match="jamais été entraîné"):
+        load_checkpoint(path, DEVICE)
+
+
+def test_placeholder_is_not_affected_by_the_backbone_check() -> None:
+    """Le placeholder a bien un corps ImageNet, et c'est assumé.
+
+    Il ne passe pas par `load_checkpoint` : il s'annonce comme placeholder au
+    lieu de prétendre être un modèle entraîné. Le contrôle vise les fichiers qui
+    mentent sur leur contenu, pas ceux qui le déclarent.
+    """
+    bundle = build_placeholder(DEVICE)
+
+    assert bundle.is_placeholder is True
+    assert bundle.version.startswith(PLACEHOLDER_PREFIX)
+
+
+# --------------------------------------------------------------------------- #
 # Prédiction
 # --------------------------------------------------------------------------- #
 
