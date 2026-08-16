@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 
+import ribbonLogo from '@/assets/ribbon-logo.png';
 import MedicalDisclaimer from '@/components/MedicalDisclaimer';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,7 +29,14 @@ export default function AppLayout() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-3">
-          <NavLink to="/" className="text-xl font-bold tracking-tight text-brand-700">
+          <NavLink
+            to="/"
+            className="flex items-center gap-2 text-xl font-bold tracking-tight text-brand-700"
+          >
+            {/* `alt` vide, volontairement : le mot « BreastAI » qui suit nomme
+                déjà l'application. Décrire le ruban le ferait annoncer deux
+                fois par un lecteur d'écran, sans rien apprendre de plus. */}
+            <img src={ribbonLogo} alt="" className="h-8 w-auto" />
             BreastAI
           </NavLink>
 
@@ -78,9 +86,17 @@ export default function AppLayout() {
           {/* L'avertissement médical reste présent sur toutes les pages de
               l'application, pas seulement sur les écrans de résultat. */}
           <MedicalDisclaimer />
-          <p className="text-xs text-slate-500">
-            Dédié à la mémoire de <strong className="text-slate-700">Mouna Abakar</strong>.
-          </p>
+          <div className="space-y-1 text-xs text-slate-500">
+            <p>
+              Dédié à la mémoire de <strong className="text-slate-700">Mouna Abakar</strong>.
+            </p>
+            {/* « Réalisé par » plutôt que le nom seul : placé juste sous une
+                ligne d'hommage, un nom nu se lirait comme en faisant partie. */}
+            <p>
+              Réalisé par{' '}
+              <strong className="text-slate-700">Mahamat Haroun Ibrahim</strong>
+            </p>
+          </div>
         </div>
       </footer>
     </div>
