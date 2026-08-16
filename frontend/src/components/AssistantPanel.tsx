@@ -20,6 +20,53 @@ interface Turn {
   error: string | null;
 }
 
+/**
+ * Teinte de section, sur le principe de `ModelProvenanceWarning` : un fond
+ * coloré signale un registre différent de celui des cartes neutres voisines
+ * (imagerie, lecture médicale), sans monter le volume pour autant.
+ *
+ * La teinte reste très diluée et le titre garde l'échelle typographique de ses
+ * voisins : ce qui distingue la section est la couleur, pas la taille. Un bloc
+ * qui crierait plus fort que le bandeau de provenance du modèle déplacerait
+ * l'attention au mauvais endroit — l'assistant est un confort de lecture, pas
+ * un avertissement.
+ */
+const SECTION_CLASSES = 'rounded-lg border border-brand-100 bg-brand-50/60 p-5';
+
+/** En-tête de la section, identique que l'assistant soit disponible ou non. */
+function AssistantHeading({ notice }: { notice: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span
+        // Décoratif : le titre « Assistant » juste à côté porte déjà le sens.
+        aria-hidden="true"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white"
+      >
+        {/* SVG en ligne plutôt qu'une librairie d'icônes : le projet n'en a
+            aucune, et une dépendance pour un seul pictogramme se paierait à
+            chaque installation. */}
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-5"
+        >
+          <path d="M21 11.5a8.5 8.5 0 0 1-9.1 8.5 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.1a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3a8.5 8.5 0 0 1 8.5 8.5Z" />
+        </svg>
+      </span>
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-brand-700">
+          Assistant
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">{notice}</p>
+      </div>
+    </div>
+  );
+}
+
 function AnswerBlock({ answer }: { answer: AssistantAnswer }) {
   return (
     <div className="space-y-3">
@@ -40,7 +87,7 @@ function AnswerBlock({ answer }: { answer: AssistantAnswer }) {
         <summary className="cursor-pointer">
           Contexte transmis au service ({answer.model})
         </summary>
-        <p className="mt-2 whitespace-pre-line rounded bg-slate-50 p-3 font-mono text-[11px] leading-relaxed">
+        <p className="mt-2 whitespace-pre-line rounded bg-white p-3 font-mono text-[11px] leading-relaxed">
           {answer.context_sent}
         </p>
       </details>
@@ -99,25 +146,17 @@ export default function AssistantPanel({ analysisId }: { analysisId: string }) {
 
   if (!status.data?.enabled) {
     return (
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Assistant
-        </h2>
-        <p className="mt-2 text-sm text-slate-600">
-          {status.data?.notice ?? "L'assistant n'est pas disponible."}
-        </p>
+      <section className={SECTION_CLASSES}>
+        <AssistantHeading
+          notice={status.data?.notice ?? "L'assistant n'est pas disponible."}
+        />
       </section>
     );
   }
 
   return (
-    <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-      <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Assistant
-        </h2>
-        <p className="mt-1 text-sm text-slate-600">{status.data.notice}</p>
-      </div>
+    <section className={`space-y-4 ${SECTION_CLASSES}`}>
+      <AssistantHeading notice={status.data.notice} />
 
       {turns.length === 0 && (
         <div className="flex flex-wrap gap-2">
@@ -127,7 +166,9 @@ export default function AssistantPanel({ analysisId }: { analysisId: string }) {
               type="button"
               onClick={() => submit(suggestion)}
               disabled={ask.isPending}
-              className="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              // Fond blanc et bordure brand : sur la teinte rosée, un gris sur
+              // gris deviendrait terne et les puces se fondraient dans le fond.
+              className="rounded-full border border-brand-300 bg-white px-3 py-1.5 text-xs text-brand-700 transition hover:bg-brand-50 disabled:opacity-60"
             >
               {suggestion}
             </button>
@@ -138,7 +179,7 @@ export default function AssistantPanel({ analysisId }: { analysisId: string }) {
       <ol className="space-y-5">
         {turns.map((turn, index) => (
           <li key={`${index}-${turn.question}`} className="space-y-3">
-            <p className="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800">
+            <p className="rounded-md border border-brand-100 bg-white px-3 py-2 text-sm font-medium text-slate-800">
               {turn.question}
             </p>
             {turn.answer && <AnswerBlock answer={turn.answer} />}
