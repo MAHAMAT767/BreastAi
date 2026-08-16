@@ -26,6 +26,11 @@ silencieusement fausses. Un modèle entraîné sur un autre prétraitement, ou d
 l'ordre des classes diffère, donnerait des résultats inversés sans lever la
 moindre erreur.
 
+Les poids eux-mêmes sont contrôlés, et pas seulement ce que le fichier déclare :
+`_refuse_untrained_backbone` compare le corps du réseau à un modèle ImageNet
+neuf et refuse un checkpoint resté identique. Des métadonnées décrivent ce qu'un
+notebook croyait sauvegarder ; elles ne prouvent pas ce qu'il a écrit.
+
 `clinically_validated` est facultatif et vaut `False` en son absence. Il ne dit
 pas la même chose que `is_placeholder` : le premier répond « ce modèle a-t-il été
 entraîné ? », le second « sa valeur clinique a-t-elle été établie ? ». Un modèle
@@ -36,9 +41,11 @@ entraîné sur 115 images est `is_placeholder=False` et `clinically_validated=Fa
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Final
 
@@ -92,6 +99,11 @@ DEFAULT_CLINICALLY_VALIDATED: Final[bool] = False
 PLACEHOLDER_SEED: Final[int] = 20260807
 
 DEFAULT_THRESHOLD: Final[float] = 0.5
+
+#: Préfixe des poids de la tête de classification. Elle est exclue de la
+#: comparaison à ImageNet : la fabrique la remplace systématiquement, donc elle
+#: diffère de la référence même pour un modèle jamais entraîné.
+_CLASSIFIER_PREFIX: Final[str] = "classifier."
 
 
 class ModelLoadError(Exception):
@@ -193,6 +205,99 @@ def build_placeholder(device: torch.device) -> ModelBundle:
     )
 
 
+def _tensor_digest(tensor: torch.Tensor) -> str:
+    """Empreinte d'un tenseur, forme et type compris."""
+    values = tensor.detach().cpu().contiguous()
+    header = f"{tuple(values.shape)}|{values.dtype}|".encode()
+    return hashlib.sha256(header + values.numpy().tobytes()).hexdigest()
+
+
+@lru_cache(maxsize=len(ARCHITECTURES))
+def _imagenet_backbone_digests(architecture: str) -> tuple[tuple[str, str], ...] | None:
+    """Empreintes du corps d'un réseau ImageNet neuf, ou `None` si indisponible.
+
+    Des empreintes plutôt que les tenseurs eux-mêmes : le résultat est mis en
+    cache pour la durée du processus, et stocker une vingtaine de mégaoctets de
+    poids pour ne servir qu'à des comparaisons serait payer cher un contrôle.
+
+    `None` quand les poids de référence ne peuvent pas être obtenus — pas de
+    réseau, cache `torch.hub` vide. Un contrôle d'intégrité qui empêcherait
+    l'application de démarrer hors ligne coûterait plus qu'il ne rapporte : la
+    vérification est alors sautée, et le fait est journalisé.
+    """
+    try:
+        reference = build_model(architecture, pretrained=True).state_dict()
+    except Exception as exc:  # noqa: BLE001 - réseau, disque, hub : tout est possible
+        logger.warning(
+            "Poids ImageNet de référence indisponibles pour %s (%s) : le contrôle "
+            "du corps du réseau est sauté pour ce démarrage.",
+            architecture,
+            exc,
+        )
+        return None
+
+    return tuple(
+        (name, _tensor_digest(value))
+        for name, value in reference.items()
+        if not name.startswith(_CLASSIFIER_PREFIX)
+    )
+
+
+def _refuse_untrained_backbone(
+    state_dict: dict[str, Any], architecture: str, path: Path
+) -> None:
+    """Refuse un checkpoint dont le corps est resté celui d'ImageNet.
+
+    Un entraînement, même bref, met à jour tous les poids du corps du réseau :
+    il suffit d'un pas de descente de gradient pour qu'aucun tenseur ne soit
+    plus bit à bit celui de départ. Un corps **identique** à ImageNet signifie
+    donc que ce réseau n'a jamais rien appris de mammographies — quoi qu'en
+    disent ses métadonnées, qui sont écrites par le notebook et décrivent ce
+    qu'il *croyait* sauvegarder, pas ce qu'il a réellement écrit.
+
+    Ce contrôle existe parce que le cas s'est produit : un notebook dont la
+    cellule de construction du réseau avait été ré-exécutée après
+    l'entraînement a sauvegardé un `build_model(pretrained=True)` intact sous
+    des métadonnées annonçant douze époques et une époque sélectionnée. Le
+    fichier a passé toutes les validations de contrat — ordre des classes,
+    version de prétraitement, architecture — et a été déployé. En production il
+    répondait 50,0 % à toutes les images.
+
+    Limite assumée : un modèle entraîné en gelant le corps du réseau (*linear
+    probing*, seule la tête apprend) serait refusé à tort. Aucun des notebooks
+    du projet ne procède ainsi — ils ajustent le corps avec un taux
+    d'apprentissage réduit — et fermer cette porte vaut mieux que laisser
+    passer un réseau vierge.
+    """
+    digests = _imagenet_backbone_digests(architecture)
+    if digests is None:
+        return
+
+    compared = 0
+    for name, digest in digests:
+        value = state_dict.get(name)
+        # Jeu de clés différent : la comparaison n'a pas de sens, et
+        # `load_state_dict` refusera de toute façon des poids incompatibles.
+        if not isinstance(value, torch.Tensor):
+            return
+        if _tensor_digest(value) != digest:
+            # Un seul tenseur qui a bougé suffit : le corps a été entraîné.
+            return
+        compared += 1
+
+    if compared == 0:
+        return
+
+    raise ModelLoadError(
+        f"{path} : les {compared} tenseurs du corps du réseau sont identiques aux "
+        f"poids ImageNet de {architecture}. Ce modèle n'a jamais été entraîné sur "
+        "des mammographies, quelles que soient ses métadonnées — il produirait des "
+        "probabilités voisines de 50 % sur toutes les images. Vérifier que le "
+        "notebook a bien sauvegardé les poids de la meilleure époque et non l'état "
+        "d'un réseau reconstruit."
+    )
+
+
 def _validate_checkpoint(checkpoint: dict[str, Any], path: Path) -> None:
     """Refuse un checkpoint dont le contrat diffère de celui du code courant."""
     if "state_dict" not in checkpoint:
@@ -235,6 +340,11 @@ def load_checkpoint(path: Path, device: torch.device) -> ModelBundle:
     _validate_checkpoint(checkpoint, path)
 
     architecture = checkpoint.get("architecture", DEFAULT_ARCHITECTURE)
+
+    # Avant de construire quoi que ce soit : un réseau vierge doit être refusé
+    # ici, pas découvert en lisant des probabilités de 50 % en production.
+    _refuse_untrained_backbone(checkpoint["state_dict"], architecture, path)
+
     model = build_model(architecture)
 
     try:
