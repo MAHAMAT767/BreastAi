@@ -20,7 +20,6 @@ from app.models.patient import Patient
 
 logger = logging.getLogger(__name__)
 
-#: Profondeur de l'historique mensuel affiché.
 MONTHS_SHOWN = 12
 
 
