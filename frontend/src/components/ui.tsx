@@ -24,7 +24,6 @@ export function Alert({
 }) {
   return (
     <div
-      // Annonce le message aux lecteurs d'écran dès son apparition.
       role="alert"
       className={`rounded-lg border px-4 py-3 text-sm ${ALERT_STYLES[variant]}`}
     >
@@ -150,7 +149,6 @@ export function Button({
     <button
       {...props}
       disabled={disabled || loading}
-      // Signale l'attente aux technologies d'assistance.
       aria-busy={loading}
       className={buttonClasses(
         variant,

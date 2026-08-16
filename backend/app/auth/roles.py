@@ -21,7 +21,6 @@ class UserRole(StrEnum):
 #: Valeurs autorisées en base, utilisées par la contrainte CHECK de la table `users`.
 ROLE_VALUES: tuple[str, ...] = tuple(role.value for role in UserRole)
 
-#: Libellés d'affichage.
 ROLE_LABELS_FR: dict[str, str] = {
     UserRole.ADMIN: "Administrateur",
     UserRole.DOCTOR: "Médecin / Radiologue",
