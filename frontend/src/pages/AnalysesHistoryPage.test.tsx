@@ -51,7 +51,9 @@ describe('Historique', () => {
 
     const row = (await screen.findByText('mammo.png')).closest('tr') as HTMLElement;
     expect(within(row).getByText(/Malin/)).toBeInTheDocument();
-    expect(within(row).getByText('Oui')).toBeInTheDocument();
+    // La relecture est rendue par un badge, au même vocabulaire visuel que le
+    // résultat, plutôt que par un « Oui » / « Non » en texte brut.
+    expect(within(row).getByText('Validée')).toBeInTheDocument();
   });
 
   it('propose un lien vers chaque analyse', async () => {

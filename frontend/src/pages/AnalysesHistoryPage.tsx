@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import PredictionBadge from '@/components/PredictionBadge';
+import ReviewBadge from '@/components/ReviewBadge';
 import { Alert, Button, EmptyState, Select, Spinner, TextInput } from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
 import { PAGE_SIZE, useAnalysisSearch } from '@/lib/analysisQueries';
@@ -161,6 +162,10 @@ export default function AnalysesHistoryPage() {
       )}
 
       {items.length > 0 && (
+        // Tableau conservé plutôt que converti en `<div>` : ces données sont
+        // réellement tabulaires, et un lecteur d'écran a besoin des en-têtes
+        // pour savoir ce que dit une cellule. Ce qui change ici est la densité,
+        // pas la sémantique — lignes fines, filet léger, pas d'aplat de fond.
         <div
           className={`overflow-x-auto rounded-lg border border-slate-200 bg-white transition-opacity ${
             isFetching ? 'opacity-60' : ''
@@ -168,14 +173,20 @@ export default function AnalysesHistoryPage() {
         >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Historique des analyses</caption>
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
               <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">Date</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Fichier</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Statut</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Résultat</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Relue</th>
-                <th scope="col" className="px-4 py-3">
+                <th scope="col" className="px-3 py-2 sm:px-4 font-medium">Date</th>
+                <th scope="col" className="px-3 py-2 sm:px-4 font-medium">Fichier</th>
+                {/* Statut retiré sous 640 px : c'est la colonne la moins
+                    décisive — un résultat affiché dit déjà que l'analyse a
+                    abouti — et la garder forçait la page entière à défiler
+                    latéralement sur un téléphone. */}
+                <th scope="col" className="hidden px-3 py-2 sm:px-4 font-medium sm:table-cell">
+                  Statut
+                </th>
+                <th scope="col" className="px-3 py-2 sm:px-4 font-medium">Résultat</th>
+                <th scope="col" className="px-3 py-2 sm:px-4 font-medium">Relue</th>
+                <th scope="col" className="px-3 py-2 sm:px-4">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
@@ -183,28 +194,28 @@ export default function AnalysesHistoryPage() {
             <tbody className="divide-y divide-slate-100">
               {items.map((analysis) => (
                 <tr key={analysis.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-3 py-2 sm:px-4 tabular-nums text-slate-500">
                     {formatDateTime(analysis.created_at)}
                   </td>
-                  <td className="px-4 py-3 font-medium text-slate-900">
+                  <td className="max-w-[22ch] truncate px-3 py-2 sm:px-4 font-medium text-slate-900">
                     {analysis.original_filename}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="hidden whitespace-nowrap px-3 py-2 sm:px-4 text-slate-500 sm:table-cell">
                     {STATUS_LABELS[analysis.status]}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2 sm:px-4">
                     <PredictionBadge
                       prediction={analysis.prediction}
                       probability={analysis.probability}
                     />
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {analysis.doctor_validated ? 'Oui' : 'Non'}
+                  <td className="px-3 py-2 sm:px-4">
+                    <ReviewBadge validated={analysis.doctor_validated} />
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-3 py-2 sm:px-4 text-right">
                     <Link
                       to={`/analyses/${analysis.id}`}
-                      className="text-sm font-medium text-brand-700 underline"
+                      className="font-medium text-brand-700 hover:underline"
                     >
                       Ouvrir
                     </Link>

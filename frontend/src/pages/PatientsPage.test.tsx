@@ -64,12 +64,13 @@ describe('Liste des patients', () => {
     mockApi({ ...ME, 'GET /patients': { body: pageOf([makePatient()]) } });
     renderWithProviders(<App />, { route: '/patients', authenticated: true });
 
-    const row = (await screen.findByText('Amina Ali')).closest('tr');
+    // La ligne entière est cliquable : la cible n'est plus un lien « Ouvrir »
+    // en fin de rangée mais l'entrée de liste elle-même.
+    const row = (await screen.findByText('Amina Ali')).closest('li');
     expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getByRole('link', { name: 'Ouvrir' })).toHaveAttribute(
-      'href',
-      '/patients/patient-1',
-    );
+    expect(
+      within(row as HTMLElement).getByRole('link', { name: 'Dossier de Amina Ali' }),
+    ).toHaveAttribute('href', '/patients/patient-1');
   });
 });
 

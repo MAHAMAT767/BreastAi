@@ -57,6 +57,50 @@ export function formatBirthDate(birthDate: string | null | undefined): string {
   return age === null ? formatted : `${formatted} (${age} ans)`;
 }
 
+/**
+ * Initiales d'un patient, pour la pastille des listes.
+ *
+ * Purement décoratif : le nom complet est écrit juste à côté. Un dossier dont
+ * le nom serait vide rend une chaîne vide plutôt qu'un caractère parasite.
+ */
+export function initials(firstName: string, lastName: string): string {
+  return [firstName, lastName]
+    .map((part) => part.trim().charAt(0).toUpperCase())
+    .join('');
+}
+
+const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat('fr-FR', { numeric: 'auto' });
+
+const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['second', 60],
+  ['minute', 60],
+  ['hour', 24],
+  ['day', 7],
+  ['week', 4.35],
+  ['month', 12],
+];
+
+/**
+ * Ancienneté lisible (« il y a 3 heures »).
+ *
+ * Employée là où la date exacte n'apporte rien — une liste d'activité se lit
+ * en repérant ce qui est récent, pas en comparant des horodatages. Les vues qui
+ * servent à retrouver une analyse précise gardent `formatDateTime`.
+ */
+export function formatRelativeTime(value: string | null | undefined): string {
+  if (!value) return PLACEHOLDER;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return PLACEHOLDER;
+
+  let amount = (date.getTime() - Date.now()) / 1000;
+  for (const [unit, step] of RELATIVE_STEPS) {
+    if (Math.abs(amount) < step) return RELATIVE_FORMATTER.format(Math.round(amount), unit);
+    amount /= step;
+  }
+  return RELATIVE_FORMATTER.format(Math.round(amount), 'year');
+}
+
 /** Vide une chaîne de formulaire vers `null`, comme l'attend l'API. */
 export function emptyToNull(value: string): string | null {
   const trimmed = value.trim();
