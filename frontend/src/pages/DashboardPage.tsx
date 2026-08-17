@@ -49,7 +49,10 @@ export default function DashboardPage() {
         <ModelProvenanceWarning status={data.model_status} message={data.model_warning} />
       )}
 
-      <section aria-label="Indicateurs" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Les quatre chiffres qui portent la page. Bénin et malin sont teintés
+          parce que ce sont des résultats ; patients et analyses restent neutres
+          parce que ce sont des volumes. */}
+      <section aria-label="Indicateurs" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Patients suivis" value={formatNumber(data.total_patients)} />
         <StatTile
           label="Analyses déposées"
@@ -64,35 +67,51 @@ export default function DashboardPage() {
           label="Résultats bénins"
           value={formatNumber(data.benign_count)}
           hint="Sortie du modèle, non validée cliniquement"
+          tone="benign"
         />
         <StatTile
           label="Résultats malins"
           value={formatNumber(data.malignant_count)}
           hint="Sortie du modèle, non validée cliniquement"
+          tone="malignant"
         />
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <StatTile
-          label="Temps moyen d'analyse"
-          value={formatDuration(data.average_inference_time_ms)}
-          hint="Inférence seule, hors dépôt et prétraitement"
-        />
-        <StatTile
-          label="Analyses relues par un médecin"
-          value={formatRate(data.doctor_validation_rate)}
-          hint={`${formatNumber(data.doctor_validated_count)} sur ${formatNumber(
-            data.completed_analyses,
-          )} analyses terminées`}
-        />
+      {/* Second rang : deux mesures de fonctionnement, pas des résultats. Elles
+          descendent d'un cran typographique pour ne pas concurrencer les quatre
+          chiffres ci-dessus. */}
+      <section className="grid gap-x-8 gap-y-3 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:grid-cols-2">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm text-slate-600">Temps moyen d'analyse</span>
+          <span className="text-sm font-semibold tabular-nums text-slate-900">
+            {formatDuration(data.average_inference_time_ms)}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm text-slate-600">Analyses relues par un médecin</span>
+          <span className="text-sm font-semibold tabular-nums text-slate-900">
+            {formatRate(data.doctor_validation_rate)}
+          </span>
+        </div>
+        <p className="text-xs text-slate-500">Inférence seule, hors dépôt et prétraitement</p>
+        <p className="text-xs text-slate-500">
+          {formatNumber(data.doctor_validated_count)} sur{' '}
+          {formatNumber(data.completed_analyses)} analyses terminées
+        </p>
       </section>
 
       {/* Là où la spécification demandait « précision du modèle ». Afficher un
-          taux sous ce nom laisserait croire que la justesse a été mesurée. */}
-      <Alert variant="info">
-        <p className="font-semibold">Pourquoi aucun taux d'exactitude n'est affiché</p>
-        <p className="mt-1">{data.accuracy_note}</p>
-      </Alert>
+          taux sous ce nom laisserait croire que la justesse a été mesurée.
+          Replié : l'explication doit rester accessible sans occuper en
+          permanence la place d'un chiffre clé. */}
+      <details className="rounded-lg border border-slate-200 bg-white text-sm">
+        <summary className="cursor-pointer px-4 py-3 font-medium text-slate-700">
+          Pourquoi aucun taux d'exactitude n'est affiché
+        </summary>
+        <p className="border-t border-slate-100 px-4 py-3 leading-relaxed text-slate-600">
+          {data.accuracy_note}
+        </p>
+      </details>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-slate-200 bg-white p-5">
@@ -105,9 +124,12 @@ export default function DashboardPage() {
           {data.model_versions.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-slate-800">Modèles utilisés</h3>
-              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+              {/* Lignes fines séparées par un filet, comme les listes des autres
+                  pages : une version de modèle est une entrée de liste, pas une
+                  carte. */}
+              <ul className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
                 {data.model_versions.map((version) => (
-                  <li key={version} className="font-mono text-xs">
+                  <li key={version} className="py-1.5 font-mono text-xs text-slate-700">
                     {version}
                   </li>
                 ))}

@@ -4,10 +4,21 @@ import type { Prediction } from '@/types';
 /**
  * Pastille de résultat.
  *
- * La pastille de couleur est décorative (`aria-hidden`) : le libellé porte
- * l'information. Un lecteur d'écran, une impression en noir et blanc ou un
- * lecteur daltonien lisent la même chose que tout le monde.
+ * La teinte du fond porte le résultat — bleu pour bénin, orange pour malin —
+ * et reste la même partout où un résultat apparaît : historique, dossier,
+ * activité récente. C'est le seul endroit de l'interface où ces deux teintes
+ * sont employées comme aplat de fond ; les voir ailleurs voudrait dire qu'elles
+ * ne signifient plus rien.
+ *
+ * La couleur ne porte jamais l'information seule : le libellé « Bénin » ou
+ * « Malin » est toujours écrit. Une impression en noir et blanc, un lecteur
+ * d'écran ou un lecteur daltonien lisent la même chose que tout le monde.
  */
+const TONES: Record<Prediction, string> = {
+  benign: 'bg-[var(--color-benign-soft)] text-[var(--color-benign-strong)]',
+  malignant: 'bg-[var(--color-malignant-soft)] text-[var(--color-malignant-strong)]',
+};
+
 export default function PredictionBadge({
   prediction,
   probability,
@@ -16,21 +27,20 @@ export default function PredictionBadge({
   probability?: number | null;
 }) {
   if (!prediction) {
-    return <span className="text-sm text-slate-500">Aucun résultat</span>;
+    return <span className="text-sm text-slate-400">—</span>;
   }
 
-  const color = prediction === 'malignant' ? 'var(--color-malignant)' : 'var(--color-benign)';
-
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-800">
-      <span
-        aria-hidden="true"
-        className="size-2.5 rounded-full"
-        style={{ backgroundColor: color }}
-      />
+    <span
+      className={`inline-flex items-baseline gap-1.5 rounded px-2 py-0.5 text-sm font-medium ${TONES[prediction]}`}
+    >
       {PREDICTION_LABELS[prediction]}
       {probability != null && (
-        <span className="text-slate-600">· {(probability * 100).toFixed(1)} %</span>
+        // `tabular-nums` : les pourcentages s'empilent en colonne dans les
+        // listes, des chiffres de largeurs différentes les feraient danser.
+        <span className="text-xs tabular-nums opacity-80">
+          {(probability * 100).toFixed(1)} %
+        </span>
       )}
     </span>
   );

@@ -243,22 +243,66 @@ export function PredictionSplit({
 // Tuiles
 // --------------------------------------------------------------------------- //
 
+/**
+ * Tuile de chiffre clé.
+ *
+ * `tone` teinte la tuile quand le chiffre *est* un résultat : bleu pour les
+ * bénins, orange pour les malins, aux mêmes teintes que les pastilles et la
+ * barre de répartition. Les compteurs qui ne sont pas des résultats — patients,
+ * analyses déposées — restent neutres. C'est ce qui fait que la couleur se lit
+ * comme une information et non comme une décoration.
+ *
+ * L'ordre libellé → valeur → précision est structurant : le libellé annonce ce
+ * qu'on lit avant de le lire, et `DashboardPage.test.tsx` s'appuie sur cet
+ * ordre pour retrouver la valeur d'une tuile.
+ */
+type TileTone = 'neutral' | 'benign' | 'malignant';
+
+/*
+ * `muted` passe en slate-600 sur les fonds teintés : slate-500 y tombe à
+ * 4,2:1, sous le seuil AA, alors qu'il tient (4,8:1) sur le blanc des tuiles
+ * neutres.
+ */
+const TILE_TONES: Record<TileTone, { box: string; value: string; muted: string }> = {
+  neutral: {
+    box: 'border-slate-200 bg-white',
+    value: 'text-slate-900',
+    muted: 'text-slate-500',
+  },
+  benign: {
+    box: 'border-transparent bg-[var(--color-benign-soft)]',
+    value: 'text-[var(--color-benign-strong)]',
+    muted: 'text-slate-600',
+  },
+  malignant: {
+    box: 'border-transparent bg-[var(--color-malignant-soft)]',
+    value: 'text-[var(--color-malignant-strong)]',
+    muted: 'text-slate-600',
+  },
+};
+
 export function StatTile({
   label,
   value,
   hint,
+  tone = 'neutral',
 }: {
   label: string;
   value: string;
   hint?: string;
+  tone?: TileTone;
 }) {
+  const styles = TILE_TONES[tone];
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <p className="text-sm text-slate-500">{label}</p>
-      {/* Chiffres proportionnels : `tabular-nums` donne à chaque chiffre la
-          largeur d'un zéro, ce qui délave un grand nombre. */}
-      <p className="mt-1 text-3xl font-semibold text-slate-900">{value}</p>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    <div className={`rounded-lg border p-4 ${styles.box}`}>
+      <p className={`text-xs font-medium uppercase tracking-wide ${styles.muted}`}>{label}</p>
+      {/* `tabular-nums` : les tuiles sont alignées en grille, des chiffres de
+          largeurs différentes décaleraient les valeurs d'une colonne à l'autre. */}
+      <p className={`mt-1 text-[28px] font-semibold leading-none tabular-nums ${styles.value}`}>
+        {value}
+      </p>
+      {hint && <p className={`mt-2 text-xs leading-snug ${styles.muted}`}>{hint}</p>}
     </div>
   );
 }

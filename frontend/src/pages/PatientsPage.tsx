@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Alert, Button, EmptyState, Spinner, TextInput, buttonClasses } from '@/components/ui';
-import { formatBirthDate, formatDate } from '@/lib/format';
+import { formatBirthDate, formatDate, initials } from '@/lib/format';
 import { PAGE_SIZE, usePatientList } from '@/lib/patientQueries';
 import { useDebounce } from '@/lib/useDebounce';
 import { SEX_LABELS } from '@/types';
@@ -84,60 +84,54 @@ export default function PatientsPage() {
       )}
 
       {patients.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">Liste des dossiers patients</caption>
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  Code
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  Nom
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  Naissance
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  Sexe
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  Créé le
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {patients.map((patient) => (
-                <tr key={patient.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-mono text-xs text-slate-700">
-                    {patient.code}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-slate-900">
+        // Liste et non tableau : une entrée de dossier n'est pas une grille de
+        // cellules indépendantes mais un bloc d'identité — initiales, nom,
+        // caractéristiques — qu'on lit d'un seul tenant. L'historique des
+        // analyses, lui, reste un vrai tableau : ses colonnes se comparent.
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+          {patients.map((patient) => (
+            <li key={patient.id}>
+              {/* Toute la ligne est cliquable : viser un lien « Ouvrir » de
+                  quarante pixels dans une liste dense est une cible inutilement
+                  petite. */}
+              <Link
+                to={`/patients/${patient.id}`}
+                // Sans libellé explicite, le nom du lien serait la
+                // concaténation de tout ce que contient la ligne, ponctuation
+                // comprise. Il reste construit sur le nom affiché.
+                aria-label={`Dossier de ${patient.full_name}`}
+                className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/40"
+              >
+                {/* Teinte de marque, pas une teinte de résultat : ces deux-là
+                    sont réservées au bénin et au malin. Décoratif — le nom
+                    juste à côté porte l'information. */}
+                <span
+                  aria-hidden="true"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700"
+                >
+                  {initials(patient.first_name, patient.last_name)}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-slate-900">
                     {patient.full_name}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {formatBirthDate(patient.birth_date)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{SEX_LABELS[patient.sex]}</td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {formatDate(patient.created_at)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/patients/${patient.id}`}
-                      className="text-sm font-medium text-brand-700 underline"
-                    >
-                      Ouvrir
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </span>
+                  <span className="block truncate text-xs text-slate-500">
+                    {formatBirthDate(patient.birth_date)} · {SEX_LABELS[patient.sex]}
+                  </span>
+                </span>
+
+                <span className="hidden shrink-0 font-mono text-xs text-slate-500 sm:block">
+                  {patient.code}
+                </span>
+
+                <span className="hidden shrink-0 text-xs tabular-nums text-slate-400 sm:block">
+                  {formatDate(patient.created_at)}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
 
       {total > PAGE_SIZE && (

@@ -26,6 +26,21 @@
   --color-benign: #2a78d6;
   --color-malignant: #eb6834;
 
+  /* Déclinaisons des deux mêmes teintes, pour les aplats (pastilles, tuiles).
+   *
+   * Ce ne sont pas de nouvelles couleurs : `-soft` est un fond très dilué,
+   * `-strong` le texte porté dessus. Les teintes de base ci-dessus ne peuvent
+   * pas servir de couleur de texte — 4,42:1 pour le bleu et 3,20:1 pour
+   * l'orange sur blanc, sous le seuil AA de 4,5:1 exigé en petite taille.
+   * Elles restent réservées aux aplats pleins (barres, pastilles de légende),
+   * où le contraste de texte ne s'applique pas.
+   *
+   * Couples vérifiés : bleu 6,91:1 sur son fond, orange 6,07:1 sur le sien. */
+  --color-benign-soft: #eaf2fd;
+  --color-benign-strong: #14548f;
+  --color-malignant-soft: #fdeee7;
+  --color-malignant-strong: #97400f;
+
   /* Chrome des graphiques : discret, une nuance au-dessus de la surface. */
   --color-chart-grid: #e1e0d9;
   --color-chart-axis: #c3c2b7;
