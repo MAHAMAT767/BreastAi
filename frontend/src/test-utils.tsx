@@ -69,6 +69,11 @@ export function makeAnalysis(overrides: Partial<Analysis> = {}): Analysis {
     clinically_validated: false,
     model_status: 'placeholder',
     model_warning: '⚠️ MODÈLE DE DÉMONSTRATION — AUCUNE VALEUR CLINIQUE.',
+    // Cohérent avec `probability: 0.31` ci-dessus, comme le ferait le serveur.
+    followup_urgency: 'surveillance',
+    followup_label: 'Contrôle de suivi recommandé sous 6 mois',
+    followup_notice:
+      'Délai indicatif généré automatiquement, non prescriptif — la décision clinique revient au médecin.',
     has_gradcam: true,
     gradcam_disclaimer:
       "La carte de chaleur indique les régions ayant influencé la décision du modèle, et non l'emplacement d'une lésion.",

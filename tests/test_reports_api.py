@@ -229,3 +229,25 @@ def test_verification_without_a_report(
 
     assert body["has_report"] is False
     assert body["signature_valid"] is False
+
+
+def test_regenerated_report_carries_the_same_followup_as_the_analysis(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    """Le rapport et l'écran annoncent le même délai.
+
+    Les deux passent par `derive_followup_urgency` : c'est la seule garantie
+    qu'un document remis à une patiente ne contredise pas l'application.
+    """
+    analysis_id = upload(client, doctor_headers, patient)
+
+    report = client.post(
+        f"{PREFIX}/analyses/{analysis_id}/report", headers=doctor_headers
+    ).json()
+    analysis = client.get(
+        f"{PREFIX}/analyses/{analysis_id}", headers=doctor_headers
+    ).json()
+
+    assert report["followup_urgency"] == analysis["followup_urgency"]
+    assert report["followup_label"] == analysis["followup_label"]
+    assert "non prescriptif" in report["followup_notice"]

@@ -261,3 +261,57 @@ describe('Dépôt de mammographie', () => {
     expect(within(table).getByText(/Bénin/)).toBeInTheDocument();
   });
 });
+
+describe('Délai de prise en charge', () => {
+  it('affiche le libellé renvoyé par le serveur, sans le reconstruire', async () => {
+    openAnalysis({
+      prediction: 'malignant',
+      probability: 0.91,
+      followup_urgency: 'urgent',
+      followup_label: 'Consultation spécialisée recommandée sous 1 à 2 semaines',
+    });
+
+    expect(
+      await screen.findByText('Consultation spécialisée recommandée sous 1 à 2 semaines'),
+    ).toBeInTheDocument();
+  });
+
+  it('accompagne toujours le délai de la mention non prescriptive', async () => {
+    // La grille n'est pas validée cliniquement : un délai affiché seul se lit
+    // comme une consigne médicale.
+    openAnalysis({ followup_urgency: 'surveillance' });
+
+    expect(await screen.findByText(/non prescriptif/)).toBeInTheDocument();
+    expect(screen.getByText(/la décision clinique revient au médecin/)).toBeInTheDocument();
+  });
+
+  it("n'affiche rien quand l'analyse n'a pas de résultat", async () => {
+    openAnalysis({
+      status: 'pending',
+      prediction: null,
+      probability: null,
+      followup_urgency: null,
+      followup_label: null,
+      followup_notice: null,
+    });
+
+    await screen.findByText('Probabilité de malignité');
+    expect(screen.queryByText('Délai de prise en charge suggéré')).not.toBeInTheDocument();
+  });
+
+  it('reste moins proéminent que le bandeau de non-validation', async () => {
+    // Hiérarchie voulue : l'avertissement de provenance dit que les chiffres
+    // ne valent rien cliniquement, il doit rester le plus fort de la page.
+    openAnalysis({ followup_urgency: 'urgent' });
+
+    const followup = (await screen.findByText('Délai de prise en charge suggéré')).closest(
+      'aside',
+    ) as HTMLElement;
+    // Ciblé par son attribut : plusieurs `role="alert"` coexistent sur la page.
+    const warning = document.querySelector('[data-model-status]') as HTMLElement;
+
+    expect(warning.className).toContain('border-2');
+    expect(followup.className).not.toContain('border-2');
+    expect(followup.dataset.followupUrgency).toBe('urgent');
+  });
+});

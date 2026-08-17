@@ -223,3 +223,13 @@ describe('Accès', () => {
     expect(screen.queryByRole('link', { name: 'Patients' })).not.toBeInTheDocument();
   });
 });
+
+describe('Délai de prise en charge', () => {
+  it("n'apparaît pas sur le tableau de bord", async () => {
+    // Le tableau de bord agrège : un délai n'y désignerait aucune analyse.
+    openDashboard();
+    await screen.findByText('Patients suivis');
+
+    expect(screen.queryByText('Délai de prise en charge suggéré')).not.toBeInTheDocument();
+  });
+});

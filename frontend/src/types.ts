@@ -100,6 +100,19 @@ export const PREDICTION_LABELS: Record<Prediction, string> = {
  */
 export type ModelStatus = 'placeholder' | 'trained_unvalidated' | 'validated';
 
+/**
+ * Délai de prise en charge suggéré, du plus pressant au moins pressant.
+ *
+ * Dérivé côté serveur de la probabilité déjà calculée (`app/followup.py`) — ce
+ * n'est pas une seconde prédiction. La grille n'est **pas validée
+ * cliniquement** : `followup_notice` doit accompagner le délai partout où il
+ * est affiché.
+ *
+ * Le libellé vient du serveur et n'est jamais reconstruit ici : la règle vit à
+ * un seul endroit, sinon l'écran et le rapport PDF finissent par diverger.
+ */
+export type FollowupUrgency = 'urgent' | 'rapproche' | 'surveillance' | 'routine';
+
 export interface SuspiciousRegion {
   x: number;
   y: number;
@@ -132,6 +145,11 @@ export interface Analysis {
   clinically_validated: boolean;
   model_status: ModelStatus;
   model_warning: string | null;
+
+  followup_urgency: FollowupUrgency | null;
+  followup_label: string | null;
+  followup_notice: string | null;
+
   has_gradcam: boolean;
   gradcam_disclaimer: string | null;
   suspicious_region: SuspiciousRegion | null;

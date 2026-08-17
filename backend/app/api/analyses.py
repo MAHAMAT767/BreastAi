@@ -312,8 +312,8 @@ def regenerate_report(
         detail="Rapport régénéré",
     )
 
-    # `model_warning` et `model_status` sont dérivés par le schéma : un seul
-    # endroit décide du texte affiché.
+    # `model_warning`, `model_status` et le délai de prise en charge sont dérivés
+    # par le schéma : un seul endroit décide du texte affiché.
     return ReportInfo(
         analysis_id=analysis.id,
         signature=result.signature,
@@ -321,6 +321,8 @@ def regenerate_report(
         size_bytes=len(result.pdf),
         is_placeholder_model=is_placeholder_version(analysis.model_version),
         clinically_validated=analysis.clinically_validated,
+        prediction=analysis.prediction,
+        probability=analysis.probability,
     )
 
 
