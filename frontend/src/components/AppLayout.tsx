@@ -29,16 +29,25 @@ export default function AppLayout() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-3">
-          <NavLink
-            to="/"
-            className="flex items-center gap-2 text-xl font-bold tracking-tight text-brand-700"
-          >
-            {/* `alt` vide, volontairement : le mot « BreastAI » qui suit nomme
-                déjà l'application. Décrire le ruban le ferait annoncer deux
-                fois par un lecteur d'écran, sans rien apprendre de plus. */}
-            <img src={ribbonLogo} alt="" className="h-8 w-auto" />
-            BreastAI
-          </NavLink>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <NavLink
+              to="/"
+              className="flex items-center gap-2 text-xl font-bold tracking-tight text-brand-700"
+            >
+              {/* `alt` vide, volontairement : le mot « BreastAI » qui suit nomme
+                  déjà l'application. Décrire le ruban le ferait annoncer deux
+                  fois par un lecteur d'écran, sans rien apprendre de plus. */}
+              <img src={ribbonLogo} alt="" className="h-8 w-auto" />
+              BreastAI
+            </NavLink>
+            {/* Hors du lien, et non dedans : le libellé du lien d'accueil est
+                annoncé sur chaque page, et le nom de l'auteur n'a pas à en
+                faire partie. Le crédit du pied de page reste la mention de
+                référence, celle-ci ne fait que la confirmer. */}
+            <span className="text-xs font-normal text-slate-500">
+              par <span className="font-semibold">Mahamat Haroun Ibrahim</span>
+            </span>
+          </div>
 
           <nav aria-label="Navigation principale" className="flex items-center gap-1">
             <NavLink to="/" end className={navLinkClasses}>
