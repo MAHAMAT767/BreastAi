@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import AssistantPanel from '@/components/AssistantPanel';
+import FollowupRecommendation from '@/components/FollowupRecommendation';
 import ModelProvenanceWarning from '@/components/ModelProvenanceWarning';
 import PredictionBadge from '@/components/PredictionBadge';
 import { Alert, Button, Spinner, TextArea } from '@/components/ui';
@@ -292,10 +293,15 @@ export default function AnalysisDetailPage() {
           />
           <ResultRow label="Format" value={(analysis.image_format ?? '—').toUpperCase()} />
         </dl>
-        <div className="py-3">
+        <div className="space-y-3 py-3">
           <PredictionBadge
             prediction={analysis.prediction}
             probability={analysis.probability}
+          />
+          <FollowupRecommendation
+            urgency={analysis.followup_urgency}
+            label={analysis.followup_label}
+            notice={analysis.followup_notice}
           />
         </div>
       </section>

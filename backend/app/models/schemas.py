@@ -29,6 +29,12 @@ from app.disclaimer import (
     derive_model_status,
     model_warning_for,
 )
+from app.followup import (
+    FOLLOWUP_NOTICE,
+    FollowupUrgency,
+    derive_followup_urgency,
+    followup_label_for,
+)
 from app.models.email_address import EmailAddress
 
 ItemT = TypeVar("ItemT")
@@ -254,6 +260,17 @@ class AnalysisRead(BaseModel):
     #: Texte de l'avertissement correspondant, `None` si le modèle est validé.
     model_warning: str | None = None
 
+    # ---------- Délai de prise en charge ----------
+    #: Niveau de suivi déduit de `probability`. `None` tant qu'aucun résultat
+    #: n'a été produit. Ce n'est pas une seconde prédiction : la probabilité est
+    #: calculée une fois, ici elle est seulement rangée dans une tranche.
+    followup_urgency: FollowupUrgency | None = None
+    #: Phrase correspondante, pour que l'interface n'ait pas à réimplémenter la
+    #: grille — un délai réécrit côté client finirait par diverger du rapport.
+    followup_label: str | None = None
+    #: Mention obligatoire : la grille n'est pas validée cliniquement.
+    followup_notice: str | None = None
+
     # ---------- Autres champs calculés ----------
     has_gradcam: bool = False
     gradcam_disclaimer: str | None = None
@@ -279,6 +296,12 @@ class AnalysisRead(BaseModel):
             self.is_placeholder_model, self.clinically_validated
         )
         self.model_warning = model_warning_for(self.model_status)
+
+        self.followup_urgency = derive_followup_urgency(self.prediction, self.probability)
+        self.followup_label = followup_label_for(self.followup_urgency)
+        # La mention ne suit que s'il y a un délai à encadrer.
+        self.followup_notice = FOLLOWUP_NOTICE if self.followup_urgency else None
+
         if self.has_gradcam:
             self.gradcam_disclaimer = GRADCAM_DISCLAIMER
         return self
@@ -325,12 +348,25 @@ class ReportInfo(BaseModel):
     model_status: ModelStatus = "placeholder"
     model_warning: str | None = None
 
+    #: Résultat de l'analyse couverte, fourni en entrée pour dériver le délai.
+    #: Le rapport et l'écran doivent annoncer le même, d'où la même fonction.
+    prediction: str | None = None
+    probability: float | None = None
+
+    followup_urgency: FollowupUrgency | None = None
+    followup_label: str | None = None
+    followup_notice: str | None = None
+
     @model_validator(mode="after")
     def _attach_model_status(self) -> ReportInfo:
         self.model_status = derive_model_status(
             self.is_placeholder_model, self.clinically_validated
         )
         self.model_warning = model_warning_for(self.model_status)
+
+        self.followup_urgency = derive_followup_urgency(self.prediction, self.probability)
+        self.followup_label = followup_label_for(self.followup_urgency)
+        self.followup_notice = FOLLOWUP_NOTICE if self.followup_urgency else None
         return self
 
 

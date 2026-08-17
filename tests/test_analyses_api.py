@@ -487,3 +487,54 @@ def test_doctor_review_is_recorded(
     body = response.json()
     assert body["doctor_validated"] is True
     assert "recontrôler" in body["doctor_comment"]
+
+
+def test_analysis_response_carries_the_followup_recommendation(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient
+) -> None:
+    """Le délai est exposé avec son libellé et sa mention, pas seulement un code.
+
+    L'interface doit pouvoir afficher la phrase telle quelle : lui faire
+    reconstruire le délai à partir du niveau ferait vivre la grille à deux
+    endroits, et le rapport PDF finirait par annoncer autre chose que l'écran.
+    """
+    body = upload(client, doctor_headers, patient, make_png_bytes()).json()
+
+    assert body["followup_urgency"] in {"urgent", "rapproche", "surveillance", "routine"}
+    assert body["followup_label"]
+    assert "non prescriptif" in body["followup_notice"]
+
+
+def test_followup_matches_the_probability_actually_returned(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient, db: Session
+) -> None:
+    """Le délai suit la probabilité enregistrée, pas une seconde inférence."""
+    analysis_id = upload(client, doctor_headers, patient, make_png_bytes()).json()["id"]
+
+    analysis = db.get(Analysis, uuid.UUID(analysis_id))
+    analysis.prediction = "malignant"
+    analysis.probability = 0.91
+    db.commit()
+
+    body = client.get(f"{PREFIX}/analyses/{analysis_id}", headers=doctor_headers).json()
+
+    assert body["followup_urgency"] == "urgent"
+    assert "1 à 2 semaines" in body["followup_label"]
+
+
+def test_pending_analysis_gets_no_followup(
+    client: TestClient, doctor_headers: dict[str, str], patient: Patient, db: Session
+) -> None:
+    """Sans résultat, aucun délai — surtout pas le plus rassurant."""
+    analysis_id = upload(client, doctor_headers, patient, make_png_bytes()).json()["id"]
+
+    analysis = db.get(Analysis, uuid.UUID(analysis_id))
+    analysis.prediction = None
+    analysis.probability = None
+    db.commit()
+
+    body = client.get(f"{PREFIX}/analyses/{analysis_id}", headers=doctor_headers).json()
+
+    assert body["followup_urgency"] is None
+    assert body["followup_label"] is None
+    assert body["followup_notice"] is None

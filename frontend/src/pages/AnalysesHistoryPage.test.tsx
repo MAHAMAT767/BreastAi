@@ -208,3 +208,16 @@ describe('Accès', () => {
     expect(await screen.findByText('Accès refusé')).toBeInTheDocument();
   });
 });
+
+describe('Délai de prise en charge', () => {
+  it("n'apparaît pas dans l'historique", async () => {
+    // Le délai n'est rendu que sur le détail, où la probabilité, la provenance
+    // du modèle et la lecture du médecin sont visibles ensemble. Dans une liste
+    // il se réduirait à une consigne sortie de son contexte.
+    openHistory(page([makeAnalysis({ followup_urgency: 'urgent' })]));
+    await screen.findByText('mammo.png');
+
+    expect(screen.queryByText('Délai de prise en charge suggéré')).not.toBeInTheDocument();
+    expect(screen.queryByText(/sous 1 à 2 semaines/)).not.toBeInTheDocument();
+  });
+});
