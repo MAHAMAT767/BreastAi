@@ -45,7 +45,7 @@ export default function AppLayout() {
                 faire partie. Le crédit du pied de page reste la mention de
                 référence, celle-ci ne fait que la confirmer. */}
             <span className="text-xs font-normal text-slate-500">
-              par Mahamat Haroun Ibrahim
+              par <span className="font-semibold">Mahamat Haroun Ibrahim</span>
             </span>
           </div>
 
